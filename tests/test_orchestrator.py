@@ -1,0 +1,54 @@
+from types import SimpleNamespace
+
+from hexswarm.agents.orchestrator import Orchestrator
+from hexswarm.llm.router import LLMRouter
+from hexswarm.safety.guard import ScopeGuard, ToolRiskLevel
+
+
+def fake_response(content):
+    message = SimpleNamespace(content=content, tool_calls=[])
+    return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+
+def make_guard(max_risk=ToolRiskLevel.POST_EXPLOIT):
+    return ScopeGuard(engagement_name="demo", allow=["example.com"], max_risk_level=max_risk)
+
+
+def test_orchestrator_runs_all_phases_in_order():
+    def fn(**kwargs):
+        # every agent immediately hands off with no tool calls
+        return fake_response("phase done")
+
+    router = LLMRouter(primary_model="fake/model", completion_fn=fn)
+    orchestrator = Orchestrator(router=router, scope_guard=make_guard())
+
+    result = orchestrator.run(goal="assess example.com", target="example.com")
+
+    assert list(result.phase_summaries.keys()) == ["recon", "scan", "exploit", "privesc"]
+    assert all(v == "phase done" for v in result.phase_summaries.values())
+    assert result.report_markdown == "phase done"
+
+
+def test_orchestrator_aborts_on_out_of_scope_target():
+    def fn(**kwargs):
+        return fake_response("should not be reached")
+
+    router = LLMRouter(primary_model="fake/model", completion_fn=fn)
+    orchestrator = Orchestrator(router=router, scope_guard=make_guard())
+
+    result = orchestrator.run(goal="assess", target="totally-unauthorized.com")
+
+    assert "error" in result.phase_summaries
+    assert "Engagement aborted" in result.report_markdown
+
+
+def test_orchestrator_respects_custom_phase_order():
+    def fn(**kwargs):
+        return fake_response("ok")
+
+    router = LLMRouter(primary_model="fake/model", completion_fn=fn)
+    orchestrator = Orchestrator(
+        router=router, scope_guard=make_guard(), phase_order=["recon", "scan"]
+    )
+    result = orchestrator.run(goal="assess", target="example.com")
+    assert list(result.phase_summaries.keys()) == ["recon", "scan"]

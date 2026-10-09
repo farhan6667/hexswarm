@@ -1,0 +1,50 @@
+# Curated attack-surface checklists, keyed by lowercase service/banner substring.
+# Checklist items are investigative prompts, not exploit code. Extend this file
+# freely for your own environment and tech stack.
+
+ftp:
+  checklist:
+    - "Check whether anonymous FTP login is permitted."
+    - "Check the reported FTP server/version against known CVEs (vsftpd 2.3.4 backdoor, ProFTPD mod_copy, etc.) via exploit_search."
+    - "Look for writable directories that are also served over HTTP (upload-to-webshell path)."
+  references:
+    - "https://nvd.nist.gov/vuln/search?query=ftp"
+
+ssh:
+  checklist:
+    - "Check for weak or default credentials, and whether password auth is even enabled."
+    - "Check SSH server version against known CVEs (e.g. libssh auth bypass, Regress4j)."
+    - "Check for exposed SSH host keys reused across hosts (fingerprint reuse)."
+  references:
+    - "https://nvd.nist.gov/vuln/search?query=openssh"
+
+smb:
+  checklist:
+    - "Check for null session / anonymous SMB access."
+    - "Check SMB signing status; unsigned SMB enables relay attacks."
+    - "Check patch level against EternalBlue (MS17-010) and PrintNightmare family CVEs."
+  references:
+    - "https://nvd.nist.gov/vuln/search?query=smb"
+
+http:
+  checklist:
+    - "Fingerprint the stack (server header, framework, CMS) before choosing payloads."
+    - "Check for default/backup files: .git, .env, backup.zip, config.php.bak."
+    - "Check for outdated CMS plugins/themes if a CMS is identified."
+    - "Test authentication endpoints for rate limiting before brute-force attempts."
+  references:
+    - "https://owasp.org/www-project-top-ten/"
+
+mysql:
+  checklist:
+    - "Check for remote root access with blank or default password."
+    - "Check mysql version against known privilege-escalation / RCE CVEs."
+  references:
+    - "https://nvd.nist.gov/vuln/search?query=mysql"
+
+rdp:
+  checklist:
+    - "Check patch level against BlueKeep (CVE-2019-0708) and subsequent RDP RCEs."
+    - "Check whether Network Level Authentication (NLA) is enforced."
+  references:
+    - "https://nvd.nist.gov/vuln/search?query=rdp"

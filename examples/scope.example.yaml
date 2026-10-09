@@ -1,0 +1,24 @@
+# Example engagement scope file.
+# Copy this to your own scope.yaml and edit before running `hexswarm run`.
+# HexSwarm refuses to touch any target that isn't covered by `allow` here.
+
+engagement_name: "example-lab-ctf"
+
+# Hostnames (globs allowed), IPs, or CIDR ranges you are authorized to test.
+allow:
+  - "10.10.10.0/24"
+  - "*.hackthebox.local"
+  - "scanme.nmap.org"   # nmap's own public test target, safe for recon practice
+
+# Explicit carve-outs within an otherwise-allowed range, e.g. a production
+# box that happens to sit in the same subnet as your lab targets.
+deny:
+  - "10.10.10.1"
+
+# Caps how aggressive the swarm is allowed to get, regardless of what any
+# individual agent decides to do. One of:
+#   read_only | active_recon | intrusive | exploit | post_exploit
+max_risk_level: "intrusive"
+
+authorized_by: "Your Name / engagement letter reference"
+notes: "Local lab / CTF practice only. Not a real engagement."

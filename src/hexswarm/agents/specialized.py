@@ -1,0 +1,99 @@
+"""Factory functions that build the standard HexSwarm phase agents.
+
+Each phase agent gets only the tools whose risk level matches its phase, so
+even if the LLM tries to call something outside its lane, the tool simply
+isn't in its schema list. Combined with ScopeGuard.max_risk_level, this gives
+two independent layers stopping a phase from overreaching.
+"""
+from __future__ import annotations
+
+from hexswarm.agents.base import Agent, AgentConfig, ConfirmFn
+from hexswarm.llm.router import LLMRouter
+from hexswarm.memory.knowledge import KnowledgeBase
+from hexswarm.safety.guard import ToolRiskLevel
+from hexswarm.tools.base import ToolRegistry
+
+RECON_PROMPT = """You are the Recon agent in HexSwarm, a multi-agent security testing swarm.
+Your job: passively and actively map the target's attack surface -- hosts, open ports,
+running services, web technologies. You do not exploit anything. Be methodical: start
+passive (whois, DNS), then move to active recon (port scan, fingerprinting) only on
+targets that are confirmed in scope. Summarize what you found clearly for the next
+agent in the pipeline."""
+
+SCAN_PROMPT = """You are the Vulnerability Scan agent in HexSwarm. You receive a recon
+summary describing hosts and services. Your job: identify concrete, specific
+vulnerabilities or misconfigurations in those services using your scanning tools.
+Do not guess -- run the appropriate tool for what the recon phase actually found
+(e.g. only run web_vuln_scan / directory_brute against confirmed HTTP services).
+Summarize concrete findings (with severity if you can estimate it) for the exploit agent."""
+
+EXPLOIT_PROMPT = """You are the Exploit agent in HexSwarm. You receive a vulnerability
+scan summary. Your job: for each credible, specific finding, decide whether a safe,
+scope-authorized proof-of-concept is warranted, and if so use exploit_search to find a
+matching known exploit, or metasploit_module_run for a named, well-understood module.
+Never invent a module name you are not confident exists. If nothing in the findings
+warrants exploitation, say so plainly instead of forcing an action."""
+
+PRIVESC_PROMPT = """You are the Privilege Escalation agent in HexSwarm. You only act if
+the exploit agent reports an actual foothold (a working shell/session) on a target.
+If no foothold was established, say so and do nothing -- these tools assume you
+already have access to the box. Your job: enumerate local privilege escalation vectors
+and summarize them for the final report."""
+
+REPORT_PROMPT = """You are the Report agent in HexSwarm. You have no tools. You receive
+the full findings log from every phase. Write a clear, professional security assessment
+summary in Markdown: an executive summary, a findings table (phase / target / severity /
+summary), and a prioritized list of recommendations. Be honest about what was and was not
+tested, and never claim a finding is confirmed if the underlying tool call was simulated."""
+
+
+def build_phase_agents(
+    router: LLMRouter,
+    knowledge_base: KnowledgeBase | None = None,
+    human_in_the_loop: bool = False,
+    confirm_fn: ConfirmFn | None = None,
+    models: dict[str, str] | None = None,
+) -> dict[str, Agent]:
+    """Builds the five standard agents, wired to the live ToolRegistry.
+
+    `models` lets you assign a cheaper/faster model to recon and a stronger
+    model to exploit reasoning, e.g.:
+        {"recon": "ollama/llama3.1", "exploit": "anthropic/claude-sonnet-5"}
+    """
+    models = models or {}
+    kb = knowledge_base or KnowledgeBase()
+
+    def make(phase: str, prompt: str, risk_levels: list[ToolRiskLevel]) -> Agent:
+        tools = list(ToolRegistry.for_phase(risk_levels).values())
+        config = AgentConfig(
+            name=f"{phase}_agent",
+            phase=phase,
+            system_prompt=prompt,
+            tools=tools,
+            model=models.get(phase),
+        )
+        return Agent(
+            config=config,
+            router=router,
+            knowledge_base=kb,
+            human_in_the_loop=human_in_the_loop,
+            confirm_fn=confirm_fn,
+        )
+
+    return {
+        "recon": make("recon", RECON_PROMPT, [ToolRiskLevel.READ_ONLY, ToolRiskLevel.ACTIVE_RECON]),
+        "scan": make("scan", SCAN_PROMPT, [ToolRiskLevel.INTRUSIVE]),
+        "exploit": make("exploit", EXPLOIT_PROMPT, [ToolRiskLevel.READ_ONLY, ToolRiskLevel.EXPLOIT]),
+        "privesc": make("privesc", PRIVESC_PROMPT, [ToolRiskLevel.POST_EXPLOIT]),
+        "report": Agent(
+            config=AgentConfig(
+                name="report_agent",
+                phase="report",
+                system_prompt=REPORT_PROMPT,
+                tools=[],
+                model=models.get("report"),
+            ),
+            router=router,
+            knowledge_base=kb,
+        ),
+    }
