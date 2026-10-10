@@ -1,4 +1,4 @@
-<h1 align="center"><img src="docs/img/banner.svg" alt="HexSwarm: a scope-gated swarm of AI agents for authorized penetration testing and CTF challenges" width="100%"></h1>
+<h1 align="center"><img src="docs/img/banner.webp" alt="HexSwarm: a scope-gated swarm of AI agents for authorized penetration testing and CTF challenges" width="100%"></h1>
 
 <p align="center">
   <a href="https://github.com/farhan6667/hexswarm/actions/workflows/ci.yml"><img src="https://github.com/farhan6667/hexswarm/actions/workflows/ci.yml/badge.svg" alt="tests"></a>
