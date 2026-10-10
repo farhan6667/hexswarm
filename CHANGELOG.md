@@ -6,6 +6,36 @@ All notable changes to HexSwarm are documented here. Format loosely follows
 ## [Unreleased]
 
 ### Added
+- MCP (Model Context Protocol) support, both directions: `hexswarm mcp-server` exposes the
+  whole tool registry over stdio MCP to any client (Claude Desktop, Claude Code, Kali's
+  native MCP workflow), scope-gated exactly like every other entry point; `hexswarm.mcp.client`
+  lets an agent pull in tools from external MCP servers via a small YAML config, each one
+  still duck-typed as a HexSwarm `Tool` so it goes through the same scope/risk gating. Verified
+  end to end against a real subprocess round trip in both directions, not just unit tests.
+- Per-tool Docker sandboxing (`HEXSWARM_SANDBOX=docker`): each tool call runs in its own
+  disposable `docker run --rm`, isolated from the host, from HexSwarm itself, and from every
+  other tool call in the run, a materially different posture than the whole app merely
+  running inside a Dockerfile.
+- `Dockerfile.toolchain`: a Kali-based image with the real pentest toolchain installed, built
+  and smoke-tested by a dedicated CI workflow that asserts a real `port_scan` against
+  scanme.nmap.org comes back `simulated=False`. This is `HEXSWARM_SANDBOX_IMAGE`'s default.
+- `hexswarm bench`: runs the CTF agent against a small local CTF-style challenge set and
+  reports a pass count, in the spirit of Cybench/NYU-CTF Bench but tiny and fully offline.
+- New `ai-security` tool category: `prompt_injection_probe` sends a battery of known
+  injection/system-prompt-leak payloads to a target chat/LLM HTTP endpoint and flags
+  responses matching compliance heuristics (triage, not a confirmed-vulnerability claim).
+  Exposed via `hexswarm ai-audit --target <url> --scope <file>`.
+- Knowledge base: per-service aliases (ssh now matches "openssh"/"libssh" banners, not just
+  the literal word) and alias-match-count ranking instead of unordered substring containment,
+  plus ten new services (postgresql, redis, mongodb, elasticsearch, jenkins, docker/kubernetes
+  APIs, telnet, vnc, snmp, wordpress).
+
+## [0.1.0] - 2026-10-10
+
+Initial public release: scope-gated recon -> scan -> exploit -> privesc -> report pipeline,
+LiteLLM-based model routing, safe-adapter tool layer with simulate mode, CLI, test suite.
+
+### Added
 - `hexswarm init`: an interactive setup wizard that writes a working `.env` and `scope.yaml`
   from a few guided questions (model choice, in-scope targets, max risk level), instead of
   requiring a new user to hand-edit `.env.example`/`scope.example.yaml` and already know
@@ -52,8 +82,3 @@ All notable changes to HexSwarm are documented here. Format loosely follows
 - `metasploit_module_run` now rejects a newline smuggled into `module` or `target`, which
   could otherwise inject extra, unintended lines into the generated msfconsole resource
   script.
-
-## [0.1.0] - 2026-10-10
-
-Initial release: scope-gated recon -> scan -> exploit -> privesc -> report pipeline,
-LiteLLM-based model routing, safe-adapter tool layer with simulate mode, CLI, test suite.
