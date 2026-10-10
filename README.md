@@ -17,13 +17,34 @@
 
 ## Screenshots
 
-<p align="center"><img src="docs/screenshots/hexswarm_help.png" alt="hexswarm --help output listing the version, tools, scope-check, run, and ctf commands" width="700"></p>
+**`hexswarm init`**, the guided setup wizard:
 
-<p align="center"><img src="docs/screenshots/hexswarm_tools.png" alt="hexswarm tools output listing all 17 registered tools with category, risk level, binary, and install status" width="700"></p>
+<p align="center"><img src="docs/screenshots/hexswarm_init.png" alt="hexswarm init interactive wizard choosing a model, naming the engagement, adding scanme.nmap.org to scope, and picking a risk level" width="700"></p>
+
+**`hexswarm doctor`**, checking the configured model and tool availability:
+
+<p align="center"><img src="docs/screenshots/hexswarm_doctor.png" alt="hexswarm doctor reporting the Anthropic API key is set, 7 of 17 tools installed, and the engagement is ready to run" width="700"></p>
+
+**`hexswarm tools`**, the full registry with risk tiers color-coded:
+
+<p align="center"><img src="docs/screenshots/hexswarm_tools.png" alt="hexswarm tools output listing all 17 registered tools with category, risk level, binary, and install status, color-coded by risk" width="700"></p>
+
+**`hexswarm run`**, a real recon pass against scanme.nmap.org through the full phase pipeline, each phase's output and the final report rendered as Markdown panels:
+
+<p align="center"><img src="docs/screenshots/hexswarm_run.png" alt="hexswarm run showing recon, scan, exploit, and privesc phase panels followed by the final Markdown assessment report" width="700"></p>
+
+**`hexswarm ctf`**, identifying and decoding a challenge file end to end:
+
+<p align="center"><img src="docs/screenshots/hexswarm_ctf.png" alt="hexswarm ctf identifying a file as ASCII text and decoding its Base64 content to recover the flag" width="700"></p>
+
+<details>
+<summary>hexswarm scope-check and --help</summary>
 
 <p align="center"><img src="docs/screenshots/hexswarm_scope_check.png" alt="hexswarm scope-check showing an authorized target accepted and an out-of-scope target rejected" width="700"></p>
 
-<p align="center"><img src="docs/screenshots/hexswarm_run_demo.png" alt="a real nmap scan against scanme.nmap.org followed by a CTF flag decode, both run through HexSwarm" width="700"></p>
+<p align="center"><img src="docs/screenshots/hexswarm_help.png" alt="hexswarm --help output listing the version, tools, scope-check, run, and ctf commands" width="700"></p>
+
+</details>
 
 ## Why HexSwarm exists
 

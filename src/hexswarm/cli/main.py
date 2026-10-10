@@ -196,6 +196,15 @@ def doctor() -> None:
         raise typer.Exit(code=1)
 
 
+RISK_LEVEL_COLOR = {
+    "read_only": "dim",
+    "active_recon": "cyan",
+    "intrusive": "yellow",
+    "exploit": "bold red",
+    "post_exploit": "bold red",
+}
+
+
 @app.command(name="tools")
 def list_tools() -> None:
     """List every registered tool, its category, risk tier, and whether its binary is installed."""
@@ -207,13 +216,16 @@ def list_tools() -> None:
     table.add_column("Installed?")
     for tool in ToolRegistry.all().values():
         if tool.local_only:
-            status = "n/a (pure Python)"
+            status = "[cyan]n/a (pure Python)[/cyan]"
         elif tool.is_available():
-            status = "yes"
+            status = "[green]yes[/green]"
         else:
-            status = "no (simulate mode)"
+            status = "[yellow]no (simulate mode)[/yellow]"
         binary_label = "(local)" if tool.local_only else tool.binary
-        table.add_row(tool.name, tool.category, tool.risk_level.value, binary_label, status)
+        risk_color = RISK_LEVEL_COLOR.get(tool.risk_level.value, "")
+        risk_label = f"[{risk_color}]{tool.risk_level.value}[/{risk_color}]" if risk_color else tool.risk_level.value
+        category_label = "[magenta]ctf[/magenta]" if tool.category == "ctf" else tool.category
+        table.add_row(tool.name, category_label, risk_label, binary_label, status)
     console.print(table)
 
 
