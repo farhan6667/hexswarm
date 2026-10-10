@@ -1,6 +1,21 @@
 # Contributing to HexSwarm
 
-Thanks for considering it. A few things that make reviews faster:
+Thanks for considering it. This is a young project built in the open, and it gets better when people who
+actually run offensive-security tooling try it and say what's missing.
+
+## Ways to help
+
+- **A compatibility report** from a real pentest host (Kali, a hardened Linux box, WSL) with the full
+  toolchain installed. Most of this was built and tested in simulate mode, so real tool output against a
+  real lab target is the most valuable thing you can send.
+- **A new tool adapter** for something HexSwarm doesn't wrap yet (see "Adding a tool" below).
+- **A fix, a test, or a clearer sentence** in the docs.
+- **A question or an idea** in [Discussions](https://github.com/farhan6667/hexswarm/discussions). Not
+  everything has to be an issue.
+
+Look for [good first issue](https://github.com/farhan6667/hexswarm/labels/good%20first%20issue) and
+[help wanted](https://github.com/farhan6667/hexswarm/labels/help%20wanted) if you're not sure where to start.
+Comment that you're taking one so two people don't do the same work.
 
 ## Setup
 
@@ -48,4 +63,16 @@ body if it's not obvious from the subject line.
 ## Reporting bugs vs. security issues
 
 Regular bugs: open a GitHub issue. Anything that lets HexSwarm bypass its own scope guard, or any other
-security issue in HexSwarm's own code: see [SECURITY.md](SECURITY.md) instead.
+security issue in HexSwarm's own code: see [SECURITY.md](SECURITY.md) instead, don't open a public issue.
+
+## Hacktoberfest
+
+This repo carries the `hacktoberfest` topic. A pull request is welcome whether or not you're taking part in
+the event, and low-effort changes that only exist to count toward it will be closed politely.
+
+## Be kind
+
+Be patient with newcomers and with the maintainer. Our [Code of Conduct](CODE_OF_CONDUCT.md) is short: be
+respectful, assume good intent, and keep feedback about the work, not the person. One addition specific to
+an offensive-security tool: see its note about what "a scope-aware adapter" means versus a ready-made
+attack chain against a named target.

@@ -25,8 +25,9 @@ Please email **nexaforge.services@gmail.com** with:
 - Steps to reproduce (a minimal scope file + command is ideal)
 - Affected version / commit hash
 
-Please do not open a public GitHub issue for a security report until we've had a chance to respond and, if
-needed, ship a fix. We aim to acknowledge reports within 5 business days.
+Please do not open a public GitHub issue for a security report until there's been a chance to respond and, if
+needed, ship a fix. This is a solo-maintained project: there's no guaranteed response time and no paid bounty,
+but reports are taken seriously and acknowledged as soon as possible.
 
 ## Supported versions
 

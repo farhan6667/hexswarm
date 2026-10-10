@@ -1,19 +1,30 @@
-<h1 align="center">HexSwarm</h1>
+<h1 align="center"><img src="docs/img/banner.svg" alt="HexSwarm: a scope-gated swarm of AI agents for authorized penetration testing and CTF challenges" width="100%"></h1>
 
 <p align="center">
-  <b>HexSwarm is an open-source Python framework for running AI agents against authorized penetration testing, bug bounty, and CTF targets.</b><br>
-  It connects to OpenAI, Anthropic, local Ollama models, or 100+ other providers through one interface, and gives those agents a scoped,
-  safety-gated library of real offensive-security tools (recon, vulnerability scanning, exploitation, and privilege escalation), so a single
-  high-level goal like "find a web server on this target and check for common vulnerabilities" turns into a coordinated, auditable swarm run.
+  <a href="https://github.com/farhan6667/hexswarm/actions/workflows/ci.yml"><img src="https://github.com/farhan6667/hexswarm/actions/workflows/ci.yml/badge.svg" alt="tests"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache-2.0"></a>
+  <img src="https://img.shields.io/badge/python-3.10%2B-3776ab.svg" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/models-OpenAI%20%7C%20Anthropic%20%7C%20Ollama%20%7C%20100%2B-5fd9a4.svg" alt="Any LiteLLM-supported model">
+  <img src="https://img.shields.io/badge/status-alpha-ff8a00.svg" alt="Status: alpha">
 </p>
 
-<p align="center">
-  <a href="https://github.com/farhan6667/hexswarm/actions"><img alt="CI" src="https://github.com/farhan6667/hexswarm/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
-  <a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-blue"></a>
-</p>
+**HexSwarm is an open source Python framework for running AI agents against authorized penetration testing, bug bounty, and CTF targets.** Independent project by Syed Farhan Ahmed (SFA) at NexaForge. It wraps publicly available security tools (nmap, Nuclei, gobuster, sqlmap, Hydra, Metasploit, searchsploit, and others) via their own CLIs; it is not affiliated with, sponsored by, or endorsed by any of their maintainers or vendors.
 
----
+It connects to OpenAI, Anthropic, local Ollama models, or 100+ other providers through one interface, and gives those agents a scoped,
+safety-gated library of real offensive-security tools (recon, vulnerability scanning, exploitation, and privilege escalation), so a single
+high-level goal like "find a web server on this target and check for common vulnerabilities" turns into a coordinated, auditable swarm run.
+
+## At a glance
+
+| | |
+|---|---|
+| **Runs** | `recon -> scan -> exploit -> privesc -> report`, a five-agent pipeline against one authorized target per engagement |
+| **Gates** | Every tool call against an explicit `scope.yaml` allow/deny list and a max risk tier, enforced in code beneath the LLM, not in its prompt |
+| **Connects to** | OpenAI, Anthropic, local Ollama, or 100+ other providers through [LiteLLM](https://github.com/BerriAI/litellm), one config line to switch |
+| **Also solves** | CTF challenges: file ID, string extraction, embedded-data scanning, hash ID, and multi-codec decoding, no scope file needed |
+| **Onboards with** | `hexswarm init` (guided setup wizard) and `hexswarm doctor` (checks your model and tools are actually ready) |
+| **Never fakes** | A missing tool binary runs in clearly labeled simulate mode instead of crashing or silently skipping |
+| **Status** | Alpha. 76 automated tests, ruff/mypy/bandit clean, independently audited; not yet battle-tested against a live engagement |
 
 ## Screenshots
 
@@ -219,11 +230,46 @@ routing with automatic fallback, and simulate-mode tooling that keeps the whole 
 No. CTF tools analyze a local file or a raw string you already have, there's no network host to authorize, so `hexswarm ctf` doesn't take a
 `--scope` argument at all. The network-pentest pipeline (`hexswarm run`) still always requires one.
 
-## Contributing
+## Contribute
 
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Please read [SECURITY.md](SECURITY.md) before reporting a
-vulnerability in HexSwarm itself.
+This project is free and built in the open. The most useful things you can send:
+
+- a **compatibility report** from a real pentest host (Kali, a hardened Linux box, WSL) with the full toolchain installed, since most of this
+  was built and tested in simulate mode,
+- a **new tool adapter** for something not wrapped yet (see [Extending HexSwarm](#extending-hexswarm) above),
+- a fix, a test, or a clearer sentence in the docs.
+
+Start with a [good first issue](https://github.com/farhan6667/hexswarm/labels/good%20first%20issue) or say hello in
+[Discussions](https://github.com/farhan6667/hexswarm/discussions). The [contributing guide](CONTRIBUTING.md) explains the two-minute setup.
+It carries the `hacktoberfest` topic, and pull requests are welcome whether or not you take part. Please read [SECURITY.md](SECURITY.md)
+before reporting a vulnerability in HexSwarm itself rather than opening a public issue.
+
+If your company can help with test infrastructure, hosting, tools, or funding, the
+[sponsor page](https://github.com/farhan6667/farhan6667/blob/main/SPONSOR.md) explains how.
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+[Apache-2.0](LICENSE). See [NOTICE](NOTICE) for the attribution and trademark note.
+
+---
+
+<div align="center">
+
+<a href="https://nexaforge.eu.cc/">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/brand/nexaforge-lockup-dark.webp">
+    <img src="docs/img/brand/nexaforge-lockup-light.webp" height="48" alt="NexaForge">
+  </picture>
+</a>
+&nbsp;&nbsp;
+<a href="https://farhan6667.github.io/portfolio/"><img src="docs/img/brand/sfa-logo.webp" height="64" alt="SFA logo"></a>
+
+**Built by [Syed Farhan Ahmed](https://github.com/farhan6667) (SFA)** at **[NexaForge](https://nexaforge.eu.cc/)**<br>
+Cyber security · Vibe coding · Web development and IT infrastructure
+
+[Website](https://nexaforge.eu.cc/) ·
+[LinkedIn](https://www.linkedin.com/in/sfa6667) ·
+[Portfolio](https://farhan6667.github.io/portfolio/) ·
+[Email](mailto:nexaforge.services@gmail.com)
+
+</div>
