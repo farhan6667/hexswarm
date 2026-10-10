@@ -15,6 +15,16 @@
 
 ---
 
+## Screenshots
+
+<p align="center"><img src="docs/screenshots/hexswarm_help.png" alt="hexswarm --help output listing the version, tools, scope-check, run, and ctf commands" width="700"></p>
+
+<p align="center"><img src="docs/screenshots/hexswarm_tools.png" alt="hexswarm tools output listing all 17 registered tools with category, risk level, binary, and install status" width="700"></p>
+
+<p align="center"><img src="docs/screenshots/hexswarm_scope_check.png" alt="hexswarm scope-check showing an authorized target accepted and an out-of-scope target rejected" width="700"></p>
+
+<p align="center"><img src="docs/screenshots/hexswarm_run_demo.png" alt="a real nmap scan against scanme.nmap.org followed by a CTF flag decode, both run through HexSwarm" width="700"></p>
+
 ## Why HexSwarm exists
 
 Most "AI pentesting" demos are a single agent in a loop with a handful of hardcoded shell calls. That's fine for a conference talk and useless for
