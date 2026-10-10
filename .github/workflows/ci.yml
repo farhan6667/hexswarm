@@ -42,4 +42,7 @@ jobs:
       - name: Dependency vulnerability scan (pip-audit)
         run: |
           pip install pip-audit
-          pip-audit --strict
+          # --skip-editable: hexswarm itself is installed in editable mode and isn't on
+          # PyPI, so auditing it as a "dependency" always fails with --strict. This audits
+          # the real third-party dependencies only.
+          pip-audit --strict --skip-editable
