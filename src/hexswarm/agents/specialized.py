@@ -46,6 +46,19 @@ summary in Markdown: an executive summary, a findings table (phase / target / se
 summary), and a prioritized list of recommendations. Be honest about what was and was not
 tested, and never claim a finding is confirmed if the underlying tool call was simulated."""
 
+CTF_PROMPT = """You are the CTF agent in HexSwarm. You receive a path to a local challenge
+file (or a raw string, e.g. a captured hash or ciphertext) and a goal describing what kind
+of challenge it is, if known. Your job: figure out the flag or the next useful fact about
+the file. Work methodically: identify the file type first (file_identify), pull printable
+strings (string_extract), check for hidden embedded data (binwalk_scan) on binaries/images,
+and try decode_text on any suspicious encoded-looking string you find along the way,
+including in the output of your own previous tool calls. Use hash_identify if you find a
+hash. Chain tools: the output of one call is often the input to the next (decode a string,
+then decode the result again). State the flag clearly the moment you find one, in the exact
+format given if the goal specifies one (e.g. flag{...}). If you genuinely cannot find it
+after exhausting the obvious angles, say so and summarize what you tried and what you'd
+check next with more time."""
+
 
 def build_phase_agents(
     router: LLMRouter,
@@ -97,3 +110,26 @@ def build_phase_agents(
             knowledge_base=kb,
         ),
     }
+
+
+def build_ctf_agent(
+    router: LLMRouter,
+    model: str | None = None,
+    max_steps: int = 10,
+) -> Agent:
+    """Builds the standalone CTF-solving agent (category='ctf' tools only).
+
+    This is intentionally separate from build_phase_agents(): CTF tools
+    operate on local files/strings, not network targets, so they don't
+    belong in the recon -> scan -> exploit -> privesc pipeline at all.
+    """
+    tools = list(ToolRegistry.for_category("ctf").values())
+    config = AgentConfig(
+        name="ctf_agent",
+        phase="ctf",
+        system_prompt=CTF_PROMPT,
+        tools=tools,
+        model=model,
+        max_steps=max_steps,
+    )
+    return Agent(config=config, router=router)

@@ -51,6 +51,20 @@ hexswarm run \
   --scope examples/scope.example.yaml
 ```
 
+Before anything runs, HexSwarm shows the engagement name, target, who authorized it, and the max risk level from your scope file, and asks you
+to confirm once. Pass `--yes` to skip that prompt for CI or scripted use.
+
+### CTF mode
+
+CTF challenges aren't network targets, so they get their own agent and command, no scope file needed:
+
+```bash
+hexswarm ctf --goal "find the flag in this binary" --file ./challenge.bin
+```
+
+The CTF agent identifies the file type, pulls printable strings, checks for embedded data, and tries common encodings (Base64/Base32/hex/
+URL/ROT13/binary) on anything that looks encoded, chaining its own tool outputs together until it finds a flag or runs out of obvious angles.
+
 ## Install
 
 ```bash
@@ -60,8 +74,13 @@ pip install -e .
 ```
 
 HexSwarm itself has no heavy dependencies, it's a thin orchestration layer. The underlying security tools (`nmap`, `nuclei`, `gobuster`,
-`sqlmap`, `hydra`, `searchsploit`, Metasploit) are expected to live on a proper pentest host (Kali, a security-focused Linux box, or WSL). If a
-binary isn't present, the matching tool runs in simulate mode automatically, so the framework and its test suite work anywhere Python runs.
+`sqlmap`, `hydra`, `searchsploit`, Metasploit, plus `file`/`strings`/`binwalk`/`hashid` for CTF mode) are expected to live on a proper pentest
+host (Kali, a security-focused Linux box, or WSL). If a binary isn't present, the matching tool runs in simulate mode automatically, so the
+framework and its test suite work anywhere Python runs.
+
+Prefer a container to a bare host? `docker build -t hexswarm .` gives HexSwarm an isolated place to run. The default image doesn't bundle the
+pentest toolchain (see the comment at the top of the [Dockerfile](Dockerfile) for how to layer it on top of a Kali base image), so out of the
+box it runs the same way a plain dev machine does: real logic, simulated tool output.
 
 ## Configure a model
 
@@ -118,7 +137,10 @@ class MyScanner(Tool):
 ToolRegistry.register(MyScanner())
 ```
 
-It's picked up automatically by whichever phase agent matches its `risk_level`, no orchestrator changes needed.
+It's picked up automatically by whichever phase agent matches its `risk_level`, no orchestrator changes needed. Set `category = "ctf"` instead
+of the default `"pentest"` if it belongs to the CTF agent rather than the network pipeline, and `requires_scope_check = False` if its `target`
+is a local file path or search string rather than an actual network host (the scope guard would otherwise reject every call, since a file path
+can never match a host/CIDR/domain allow rule).
 
 ## Frequently asked questions
 
@@ -143,6 +165,10 @@ is switched on or off. HITL is an optional extra layer for anyone who wants per-
 Five things: a scope guard that physically blocks out-of-scope tool calls, a phase-based tool allowlist (the exploit agent literally cannot call
 privesc tools), a shared findings store so agents build on each other's work instead of starting from a blank context, provider-agnostic model
 routing with automatic fallback, and simulate-mode tooling that keeps the whole pipeline testable without a live target.
+
+**Does CTF mode need a scope file too?**
+No. CTF tools analyze a local file or a raw string you already have, there's no network host to authorize, so `hexswarm ctf` doesn't take a
+`--scope` argument at all. The network-pentest pipeline (`hexswarm run`) still always requires one.
 
 ## Contributing
 

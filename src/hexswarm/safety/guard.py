@@ -13,6 +13,7 @@ import ipaddress
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 
@@ -70,9 +71,27 @@ class ScopeGuard:
             notes=data.get("notes", ""),
         )
 
-    def _matches(self, pattern: str, target: str) -> bool:
-        pattern = pattern.strip()
+    @staticmethod
+    def _extract_host(target: str) -> str:
+        """Pulls the bare host out of a URL-style target.
+
+        Several tools (web_vuln_scan, directory_brute, sql_injection_scan,
+        http_fingerprint, ...) take a full URL like 'https://example.com/admin'
+        as their target. Matching that whole string against a scope entry
+        written as a domain ('*.example.com') would never succeed, since the
+        scheme and path are part of the string being glob-matched. Scope
+        files are written in terms of hosts, so URL targets are reduced to
+        their host before matching.
+        """
         target = target.strip()
+        if "://" in target:
+            parsed = urlparse(target)
+            return parsed.hostname or target
+        return target
+
+    def _matches(self, pattern: str, raw_target: str) -> bool:
+        pattern = pattern.strip()
+        target = self._extract_host(raw_target)
         # CIDR / IP network match
         try:
             network = ipaddress.ip_network(pattern, strict=False)

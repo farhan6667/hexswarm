@@ -8,9 +8,10 @@ from rich.table import Table
 
 from hexswarm import __version__
 from hexswarm.agents.orchestrator import Orchestrator
+from hexswarm.agents.specialized import build_ctf_agent
 from hexswarm.config import load_settings
 from hexswarm.llm.router import LLMRouter
-from hexswarm.safety.guard import ScopeGuard, ScopeViolation
+from hexswarm.safety.guard import ScopeGuard, ScopeViolation, ToolRiskLevel
 from hexswarm.tools.base import ToolRegistry
 
 app = typer.Typer(
@@ -29,15 +30,22 @@ def version() -> None:
 
 @app.command(name="tools")
 def list_tools() -> None:
-    """List every registered tool, its risk tier, and whether its binary is installed."""
+    """List every registered tool, its category, risk tier, and whether its binary is installed."""
     table = Table(title="HexSwarm tool registry")
     table.add_column("Name")
+    table.add_column("Category")
     table.add_column("Risk level")
     table.add_column("Binary")
     table.add_column("Installed?")
     for tool in ToolRegistry.all().values():
-        installed = "yes" if tool.is_available() else "no (simulate mode)"
-        table.add_row(tool.name, tool.risk_level.value, tool.binary, installed)
+        if tool.local_only:
+            status = "n/a (pure Python)"
+        elif tool.is_available():
+            status = "yes"
+        else:
+            status = "no (simulate mode)"
+        binary_label = "(local)" if tool.local_only else tool.binary
+        table.add_row(tool.name, tool.category, tool.risk_level.value, binary_label, status)
     console.print(table)
 
 
@@ -68,6 +76,10 @@ def run(
     findings_out: Path = typer.Option(
         None, "--findings-out", help="Optional JSON path to persist raw findings."
     ),
+    yes: bool = typer.Option(
+        False, "--yes", "-y",
+        help="Skip the pre-run authorization confirmation prompt (for CI/scripted use).",
+    ),
 ) -> None:
     """Run the full recon -> scan -> exploit -> privesc -> report swarm against a target."""
     settings = load_settings()
@@ -76,6 +88,26 @@ def run(
     except (FileNotFoundError, ValueError) as exc:
         console.print(f"[red]Scope error[/red]: {exc}")
         raise typer.Exit(code=1)
+
+    try:
+        guard.check_target(target)
+    except ScopeViolation as exc:
+        console.print(f"[red]Scope error[/red]: {exc}")
+        raise typer.Exit(code=1)
+
+    if not yes:
+        console.print(
+            f"[bold]Engagement[/bold]: {guard.engagement_name}\n"
+            f"[bold]Target[/bold]: {target}\n"
+            f"[bold]Authorized by[/bold]: {guard.authorized_by or '(not recorded in scope file)'}\n"
+            f"[bold]Max risk level[/bold]: {guard.max_risk_level.value}\n"
+            "HexSwarm is about to run autonomously (no per-step confirmation) against a real "
+            "target. This is only appropriate for a system you own or are explicitly authorized "
+            "to test (your own lab, a CTF, an in-scope bug bounty asset, or a signed engagement)."
+        )
+        if not typer.confirm("Proceed?"):
+            console.print("Aborted. Nothing was run.")
+            raise typer.Exit(code=1)
 
     router = LLMRouter(
         primary_model=model or settings.primary_model,
@@ -103,6 +135,50 @@ def run(
 
     report_out.write_text(result.report_markdown, encoding="utf-8")
     console.print(f"\n[green]Report written to {report_out}[/green]")
+
+
+@app.command()
+def ctf(
+    goal: str = typer.Option(
+        ..., "--goal", "-g",
+        help="What kind of challenge this is / what you're looking for, e.g. 'find the flag in this binary'.",
+    ),
+    file: Path = typer.Option(
+        ..., "--file", "-f", help="Path to the local challenge file (binary, image, capture, etc.)."
+    ),
+    model: str = typer.Option(None, "--model", help="Override the primary LLM model string."),
+) -> None:
+    """Run the standalone CTF agent against a local challenge file.
+
+    No scope file needed: CTF tools analyze local files and strings, not network
+    targets, so there's nothing to authorize against a host allowlist.
+    """
+    if not file.exists():
+        console.print(f"[red]File not found[/red]: {file}")
+        raise typer.Exit(code=1)
+
+    settings = load_settings()
+    router = LLMRouter(
+        primary_model=model or settings.primary_model,
+        fallback_models=settings.fallback_models,
+        temperature=settings.temperature,
+    )
+
+    from hexswarm.memory.findings import FindingsStore
+
+    # CTF tools never touch check_target() (requires_scope_check=False), so this guard
+    # exists only to satisfy check_risk(); its allow list is never actually consulted.
+    guard = ScopeGuard(
+        engagement_name=f"ctf-{file.name}",
+        allow=["local-file-analysis"],
+        max_risk_level=ToolRiskLevel.READ_ONLY,
+    )
+    findings = FindingsStore(engagement_name=guard.engagement_name)
+    agent = build_ctf_agent(router=router, model=model)
+
+    console.print(f"[bold]HexSwarm CTF agent[/bold] analyzing '[yellow]{file}[/yellow]'...")
+    summary = agent.run(goal=goal, target=str(file), guard=guard, findings=findings)
+    console.print(f"\n{summary}")
 
 
 if __name__ == "__main__":

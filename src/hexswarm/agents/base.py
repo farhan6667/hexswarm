@@ -19,10 +19,30 @@ from dataclasses import dataclass, field
 from hexswarm.llm.router import LLMMessage, LLMRouter
 from hexswarm.memory.findings import Finding, FindingsStore
 from hexswarm.memory.knowledge import KnowledgeBase
-from hexswarm.safety.guard import ScopeGuard, ScopeViolation
+from hexswarm.safety.guard import ScopeGuard, ScopeViolation, ToolRiskLevel
 from hexswarm.tools.base import Tool, ToolRegistry
 
 ConfirmFn = Callable[[str, dict], bool]
+
+# A tool result's severity as recorded in the shared FindingsStore. This is a
+# provisional, conservative default based on risk tier and outcome, not a
+# CVSS score: a successful exploit or post-exploit run is flagged high enough
+# that it can't get lost in a findings list sorted or filtered by severity,
+# and the report agent still writes the real narrative on top of it. A
+# failed or simulated run never outranks a genuine success at the same tier.
+_SEVERITY_BY_RISK_ON_SUCCESS: dict[ToolRiskLevel, str] = {
+    ToolRiskLevel.READ_ONLY: "info",
+    ToolRiskLevel.ACTIVE_RECON: "info",
+    ToolRiskLevel.INTRUSIVE: "low",
+    ToolRiskLevel.EXPLOIT: "high",
+    ToolRiskLevel.POST_EXPLOIT: "critical",
+}
+
+
+def _infer_severity(tool: Tool, success: bool, simulated: bool) -> str:
+    if simulated or not success:
+        return "info"
+    return _SEVERITY_BY_RISK_ON_SUCCESS.get(tool.risk_level, "info")
 
 
 @dataclass
@@ -145,7 +165,7 @@ class Agent:
                 tool_name=tool.name,
                 target=result.target,
                 summary=result.output[:500],
-                severity="info",
+                severity=_infer_severity(tool, result.success, result.simulated),
                 raw_output=result.output,
             )
         )

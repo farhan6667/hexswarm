@@ -26,6 +26,11 @@ jobs:
       - name: Lint (ruff)
         run: ruff check src tests
 
+      - name: Type check (mypy)
+        run: |
+          pip install mypy types-PyYAML
+          mypy src --ignore-missing-imports
+
       - name: Test (pytest)
         run: pytest -q
 
@@ -33,3 +38,8 @@ jobs:
         run: |
           pip install bandit
           bandit -r src -ll
+
+      - name: Dependency vulnerability scan (pip-audit)
+        run: |
+          pip install pip-audit
+          pip-audit --strict

@@ -66,6 +66,30 @@ def test_from_file_rejects_missing_file(tmp_path):
         ScopeGuard.from_file(tmp_path / "does_not_exist.yaml")
 
 
+def test_matches_url_target_against_domain_allow_rule():
+    guard = make_guard(allow=["*.example.com"], deny=[])
+    # web_vuln_scan / directory_brute / sql_injection_scan / http_fingerprint all pass full
+    # URLs as their target; the scope entry is written as a domain glob, not a URL glob.
+    guard.check_target("https://api.example.com/admin?x=1")  # should not raise
+
+
+def test_matches_url_target_against_cidr_allow_rule():
+    guard = make_guard(allow=["10.10.10.0/24"], deny=[])
+    guard.check_target("http://10.10.10.50:8080/login")  # should not raise
+
+
+def test_matches_url_target_rejects_out_of_scope_host():
+    guard = make_guard(allow=["*.example.com"], deny=[])
+    with pytest.raises(ScopeViolation):
+        guard.check_target("https://evil.other.com/path")
+
+
+def test_matches_url_target_still_applies_deny_rules():
+    guard = make_guard(allow=["*.example.com"], deny=["admin.example.com"])
+    with pytest.raises(ScopeViolation):
+        guard.check_target("https://admin.example.com/login")
+
+
 def test_from_file_loads_valid_scope(tmp_path):
     scope_path = tmp_path / "scope.yaml"
     scope_path.write_text(

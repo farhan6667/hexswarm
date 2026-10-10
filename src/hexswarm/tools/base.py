@@ -21,7 +21,7 @@ from __future__ import annotations
 import shlex
 import shutil
 import subprocess
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
@@ -57,6 +57,24 @@ class Tool(ABC):
     description: ClassVar[str]
     binary: ClassVar[str]
     risk_level: ClassVar[ToolRiskLevel]
+    # Most tools' "target" kwarg is a real network address and must clear the
+    # scope guard's allow/deny matching. A few (e.g. exploit_search) only ever
+    # touch a local database keyed by a product/version string, not a host on
+    # the network; forcing that string through check_target() would reject
+    # every call since it can never match a host/CIDR/domain allow pattern.
+    # Those tools set this to False and still go through check_risk().
+    requires_scope_check: ClassVar[bool] = True
+    # Groups tools for agent/CLI selection independent of risk tier. "pentest"
+    # tools (the default) feed the recon/scan/exploit/privesc pipeline;
+    # "ctf" tools feed the separate CTF-solving agent instead (see
+    # agents/specialized.py and `hexswarm ctf`). Both still go through the
+    # same scope/risk gating in run().
+    category: ClassVar[str] = "pentest"
+    # True for tools that are pure Python (file/string/crypto analysis) and
+    # never shell out to an external binary at all. These skip the
+    # binary-availability check and subprocess entirely and are never
+    # "simulated": run_local() either produces real output or raises.
+    local_only: ClassVar[bool] = False
     parameters_schema: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
@@ -67,11 +85,21 @@ class Tool(ABC):
     timeout_seconds: ClassVar[int] = 120
 
     def is_available(self) -> bool:
+        if self.local_only:
+            return True  # pure Python, never shells out, never "missing"
         return shutil.which(self.binary) is not None
 
-    @abstractmethod
     def build_command(self, **kwargs: Any) -> list[str]:
-        """Return the argv list for the underlying CLI tool."""
+        """Return the argv list for the underlying CLI tool.
+
+        Not abstract: local_only tools never call this, so they can skip
+        implementing it and only define run_local() instead.
+        """
+        raise NotImplementedError(f"{self.name} is local_only and has no subprocess command.")
+
+    def run_local(self, **kwargs: Any) -> str:
+        """Pure-Python implementation for a local_only tool. Must be overridden."""
+        raise NotImplementedError(f"{self.name} must override run_local().")
 
     def simulate(self, command: list[str], **kwargs: Any) -> str:
         """Default synthetic output when the binary is not installed."""
@@ -85,7 +113,32 @@ class Tool(ABC):
 
     def run(self, guard: ScopeGuard, **kwargs: Any) -> ToolResult:
         target = kwargs.get("target", "")
-        guard.authorize(target, self.risk_level)
+        if self.requires_scope_check:
+            guard.authorize(target, self.risk_level)
+        else:
+            guard.check_risk(self.risk_level)
+
+        if self.local_only:
+            try:
+                output = self.run_local(**kwargs)
+                return ToolResult(
+                    tool_name=self.name,
+                    target=target,
+                    command=f"<local:{self.name}>",
+                    simulated=False,
+                    success=True,
+                    output=output,
+                )
+            except Exception as exc:  # noqa: BLE001 - surface any analysis failure as a result
+                return ToolResult(
+                    tool_name=self.name,
+                    target=target,
+                    command=f"<local:{self.name}>",
+                    simulated=False,
+                    success=False,
+                    output="",
+                    error=str(exc),
+                )
 
         command = self.build_command(**kwargs)
         command_str = shlex.join(command)
@@ -164,8 +217,16 @@ class ToolRegistry:
         return dict(cls._tools)
 
     @classmethod
-    def for_phase(cls, risk_levels: list[ToolRiskLevel]) -> dict[str, Tool]:
-        return {n: t for n, t in cls._tools.items() if t.risk_level in risk_levels}
+    def for_phase(cls, risk_levels: list[ToolRiskLevel], category: str = "pentest") -> dict[str, Tool]:
+        return {
+            n: t
+            for n, t in cls._tools.items()
+            if t.risk_level in risk_levels and t.category == category
+        }
+
+    @classmethod
+    def for_category(cls, category: str) -> dict[str, Tool]:
+        return {n: t for n, t in cls._tools.items() if t.category == category}
 
     @classmethod
     def schemas_for(cls, tools: list[Tool]) -> list[dict[str, Any]]:
