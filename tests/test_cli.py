@@ -1,5 +1,6 @@
 from typer.testing import CliRunner
 
+import hexswarm.cli.main as cli_main
 from hexswarm.cli.main import app
 
 runner = CliRunner()
@@ -81,3 +82,101 @@ def test_run_aborts_when_confirmation_declined(tmp_path):
     )
     assert result.exit_code == 1
     assert "Aborted" in result.stdout
+
+
+def test_init_wizard_writes_env_and_scope(tmp_path):
+    env_out = tmp_path / ".env"
+    scope_out = tmp_path / "scope.yaml"
+    # Answers in order: model preset "1" (ollama, no API key prompt), engagement name,
+    # one allow entry then a blank line to finish, risk-level choice "2", authorized_by.
+    answers = "1\nctf-lab\n10.10.10.5\n\n2\ntester\n"
+
+    result = runner.invoke(
+        app,
+        ["init", "--env-out", str(env_out), "--scope-out", str(scope_out)],
+        input=answers,
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert env_out.exists()
+    assert scope_out.exists()
+
+    env_text = env_out.read_text(encoding="utf-8")
+    assert "HEXSWARM_PRIMARY_MODEL=ollama/llama3.1" in env_text
+
+    scope_text = scope_out.read_text(encoding="utf-8")
+    assert 'engagement_name: "ctf-lab"' in scope_text
+    assert '"10.10.10.5"' in scope_text
+    assert 'max_risk_level: "active_recon"' in scope_text
+    assert 'authorized_by: "tester"' in scope_text
+
+
+def test_init_wizard_rejects_empty_scope_and_requires_at_least_one_entry(tmp_path):
+    env_out = tmp_path / ".env"
+    scope_out = tmp_path / "scope.yaml"
+    # Blank line first (rejected), then a real entry, then blank to finish.
+    answers = "1\nctf-lab\n\n10.10.10.5\n\n2\ntester\n"
+
+    result = runner.invoke(
+        app,
+        ["init", "--env-out", str(env_out), "--scope-out", str(scope_out)],
+        input=answers,
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "at least one entry is required" in result.stdout.lower()
+    assert '"10.10.10.5"' in scope_out.read_text(encoding="utf-8")
+
+
+def test_init_wizard_writes_api_key_for_cloud_provider(tmp_path):
+    env_out = tmp_path / ".env"
+    scope_out = tmp_path / "scope.yaml"
+    # Model preset "2" is Anthropic, which does prompt for an API key.
+    answers = "2\nsk-test-dummy-key\nctf-lab\n10.10.10.5\n\n1\ntester\n"
+
+    result = runner.invoke(
+        app,
+        ["init", "--env-out", str(env_out), "--scope-out", str(scope_out)],
+        input=answers,
+    )
+
+    assert result.exit_code == 0, result.stdout
+    env_text = env_out.read_text(encoding="utf-8")
+    assert "HEXSWARM_PRIMARY_MODEL=anthropic/claude-sonnet-5" in env_text
+    assert "ANTHROPIC_API_KEY=sk-test-dummy-key" in env_text
+
+
+def test_doctor_passes_when_ollama_reachable(monkeypatch):
+    monkeypatch.setenv("HEXSWARM_PRIMARY_MODEL", "ollama/llama3.1")
+    monkeypatch.setattr(cli_main.urllib.request, "urlopen", lambda *a, **k: object())
+
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 0
+    assert "Ready to run" in result.stdout
+
+
+def test_doctor_fails_when_ollama_unreachable(monkeypatch):
+    monkeypatch.setenv("HEXSWARM_PRIMARY_MODEL", "ollama/llama3.1")
+
+    def raise_unreachable(*a, **k):
+        raise cli_main.urllib.error.URLError("connection refused")
+
+    monkeypatch.setattr(cli_main.urllib.request, "urlopen", raise_unreachable)
+
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 1
+    assert "FAIL" in result.stdout
+
+
+def test_doctor_checks_cloud_provider_api_key(monkeypatch):
+    monkeypatch.setenv("HEXSWARM_PRIMARY_MODEL", "anthropic/claude-sonnet-5")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 1
+    assert "ANTHROPIC_API_KEY" in result.stdout
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-dummy-key")
+    result_ok = runner.invoke(app, ["doctor"])
+    assert result_ok.exit_code == 0
+    assert "Ready to run" in result_ok.stdout

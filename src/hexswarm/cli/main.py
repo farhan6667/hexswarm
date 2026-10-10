@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import os
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 import typer
 from rich.console import Console
+from rich.markdown import Markdown
+from rich.panel import Panel
 from rich.table import Table
 
 from hexswarm import __version__
@@ -21,11 +26,174 @@ app = typer.Typer(
 )
 console = Console()
 
+RISK_LEVEL_CHOICES = ["read_only", "active_recon", "intrusive", "exploit", "post_exploit"]
+
+MODEL_PRESETS = {
+    "1": ("Ollama (local, free, no API key)", "ollama/llama3.1", None),
+    "2": ("Anthropic Claude", "anthropic/claude-sonnet-5", "ANTHROPIC_API_KEY"),
+    "3": ("OpenAI", "openai/gpt-4o", "OPENAI_API_KEY"),
+}
+
 
 @app.command()
 def version() -> None:
     """Print the installed HexSwarm version."""
     console.print(f"hexswarm {__version__}")
+
+
+@app.command()
+def init(
+    env_path: Path = typer.Option(Path(".env"), "--env-out", help="Where to write the model config."),
+    scope_path: Path = typer.Option(Path("scope.yaml"), "--scope-out", help="Where to write the scope file."),
+) -> None:
+    """Interactive setup wizard: configure a model and write a scope file in one guided pass.
+
+    Equivalent to hand-editing .env.example and scope.example.yaml yourself, but without having
+    to already know the exact keys and risk-level vocabulary HexSwarm expects.
+    """
+    console.print(Panel.fit(
+        "[bold]HexSwarm setup[/bold]\nA couple of questions, then you're ready to run.",
+        border_style="cyan",
+    ))
+
+    # --- Step 1: model ---
+    console.print("\n[bold]1. Which model should HexSwarm use?[/bold]")
+    for key, (label, _, _) in MODEL_PRESETS.items():
+        console.print(f"  {key}) {label}")
+    console.print("  4) Something else (enter a LiteLLM model string manually)")
+    choice = typer.prompt("Choice", default="1")
+
+    api_key_line = ""
+    if choice in MODEL_PRESETS:
+        label, model_string, env_var = MODEL_PRESETS[choice]
+        if env_var:
+            console.print(
+                f"[dim]{label} needs {env_var}. It's written to your local .env only, never sent "
+                "anywhere but to that provider's own API with your requests.[/dim]"
+            )
+            key_value = typer.prompt(
+                f"Paste your {env_var} now (or press Enter to add it later)",
+                default="",
+                hide_input=True,
+                show_default=False,
+            )
+            if key_value:
+                api_key_line = f"{env_var}={key_value}\n"
+    else:
+        model_string = typer.prompt("Model string (provider/model, e.g. ollama/mistral)")
+
+    # --- Step 2: scope ---
+    console.print("\n[bold]2. What's this engagement called?[/bold]")
+    engagement_name = typer.prompt("Engagement name", default="my-engagement")
+
+    console.print(
+        "\n[bold]3. What's in scope?[/bold] Enter hosts, IPs, CIDRs, or domain globs one at a "
+        "time. Blank line when done."
+    )
+    allow: list[str] = []
+    while True:
+        entry = typer.prompt(f"  Allow entry #{len(allow) + 1} (blank to finish)", default="", show_default=False)
+        if not entry:
+            if not allow:
+                console.print("[yellow]At least one entry is required, HexSwarm refuses an empty scope.[/yellow]")
+                continue
+            break
+        allow.append(entry)
+
+    console.print("\n[bold]4. Maximum risk level for this engagement?[/bold]")
+    for i, level in enumerate(RISK_LEVEL_CHOICES, start=1):
+        console.print(f"  {i}) {level}")
+    risk_choice = typer.prompt("Choice", default="3")
+    try:
+        max_risk_level = RISK_LEVEL_CHOICES[int(risk_choice) - 1]
+    except (ValueError, IndexError):
+        max_risk_level = "intrusive"
+
+    authorized_by = typer.prompt("\n5. Authorized by (your name / engagement letter ref)", default="")
+
+    # --- Write files ---
+    if env_path.exists() and not typer.confirm(f"\n{env_path} already exists. Overwrite?", default=False):
+        console.print(f"[yellow]Skipped writing {env_path}.[/yellow]")
+    else:
+        env_path.write_text(
+            f"HEXSWARM_PRIMARY_MODEL={model_string}\n"
+            "HEXSWARM_FALLBACK_MODELS=\n"
+            f"{api_key_line}"
+            "HEXSWARM_HITL=false\n"
+            "HEXSWARM_TEMPERATURE=0.2\n"
+            "HEXSWARM_MAX_STEPS=6\n",
+            encoding="utf-8",
+        )
+        console.print(f"[green]Wrote {env_path}[/green]")
+
+    if scope_path.exists() and not typer.confirm(f"{scope_path} already exists. Overwrite?", default=False):
+        console.print(f"[yellow]Skipped writing {scope_path}.[/yellow]")
+    else:
+        allow_lines = "\n".join(f'  - "{a}"' for a in allow)
+        scope_path.write_text(
+            f'engagement_name: "{engagement_name}"\n'
+            f"allow:\n{allow_lines}\n"
+            "deny: []\n"
+            f'max_risk_level: "{max_risk_level}"\n'
+            f'authorized_by: "{authorized_by}"\n',
+            encoding="utf-8",
+        )
+        console.print(f"[green]Wrote {scope_path}[/green]")
+
+    console.print(Panel.fit(
+        "[bold green]Setup complete.[/bold green] Try it:\n\n"
+        f'[cyan]hexswarm run --goal "check for common vulnerabilities" '
+        f'--target {allow[0]} --scope {scope_path}[/cyan]',
+        border_style="green",
+    ))
+
+
+@app.command()
+def doctor() -> None:
+    """Check whether HexSwarm is actually ready to run: model reachable, tools installed."""
+    settings = load_settings()
+    all_ok = True
+
+    console.print(Panel.fit("[bold]HexSwarm doctor[/bold]", border_style="cyan"))
+
+    # --- Model check ---
+    console.print(f"\n[bold]Model[/bold]: {settings.primary_model}")
+    if settings.primary_model.startswith("ollama/"):
+        base = os.getenv("OLLAMA_API_BASE", "http://localhost:11434").rstrip("/")
+        try:
+            urllib.request.urlopen(f"{base}/api/tags", timeout=2)  # nosec B310 - fixed localhost health check
+            console.print(f"  [green]OK[/green] Ollama is reachable at {base}")
+        except (urllib.error.URLError, OSError, TimeoutError):
+            all_ok = False
+            console.print(
+                f"  [red]FAIL[/red] Can't reach Ollama at {base}. Run `ollama serve`, or pull the "
+                f"model with `ollama pull {settings.primary_model.split('/', 1)[1]}` if you haven't."
+            )
+    else:
+        provider = settings.primary_model.split("/", 1)[0]
+        env_var = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}.get(provider)
+        if env_var:
+            if os.getenv(env_var):
+                console.print(f"  [green]OK[/green] {env_var} is set")
+            else:
+                all_ok = False
+                console.print(f"  [red]FAIL[/red] {env_var} is not set. Add it to your .env file.")
+        else:
+            console.print(
+                f"  [yellow]SKIPPED[/yellow] Unrecognized provider '{provider}', check its "
+                "required environment variable yourself."
+            )
+
+    # --- Tool availability summary ---
+    tools = ToolRegistry.all()
+    installed = sum(1 for t in tools.values() if t.local_only or t.is_available())
+    console.print(f"\n[bold]Tools[/bold]: {installed}/{len(tools)} available (the rest run in simulate mode)")
+
+    if all_ok:
+        console.print("\n[bold green]Ready to run.[/bold green]")
+    else:
+        console.print("\n[bold red]Fix the items above before running against a real target.[/bold red]")
+        raise typer.Exit(code=1)
 
 
 @app.command(name="tools")
@@ -119,19 +287,33 @@ def run(
 
     findings = FindingsStore(engagement_name=guard.engagement_name, persist_path=findings_out)
 
-    orchestrator = Orchestrator(
-        router=router,
-        scope_guard=guard,
-        findings=findings,
-        human_in_the_loop=settings.human_in_the_loop,
-    )
-
     console.print(f"[bold]HexSwarm[/bold] running engagement '[cyan]{guard.engagement_name}[/cyan]' "
-                  f"against '[yellow]{target}[/yellow]'...")
-    result = orchestrator.run(goal=goal, target=target)
+                  f"against '[yellow]{target}[/yellow]'...\n")
+
+    with console.status("[bold cyan]Starting...[/bold cyan]", spinner="dots") as status:
+        def on_progress(event: str, phase: str) -> None:
+            if event == "start":
+                status.update(f"[bold cyan]{phase}[/bold cyan] agent is working...")
+            else:
+                console.print(f"  [green]done[/green]  {phase}")
+
+        orchestrator = Orchestrator(
+            router=router,
+            scope_guard=guard,
+            findings=findings,
+            human_in_the_loop=settings.human_in_the_loop,
+            progress_callback=on_progress,
+        )
+        result = orchestrator.run(goal=goal, target=target)
+
+    if "error" in result.phase_summaries:
+        console.print(Panel(result.phase_summaries["error"], title="SCOPE ERROR", border_style="red"))
+        raise typer.Exit(code=1)
 
     for phase, summary in result.phase_summaries.items():
-        console.print(f"\n[bold magenta]{phase.upper()}[/bold magenta]\n{summary}")
+        console.print(Panel(Markdown(summary), title=phase.upper(), border_style="magenta"))
+
+    console.print(Panel(Markdown(result.report_markdown), title="FINAL REPORT", border_style="green"))
 
     report_out.write_text(result.report_markdown, encoding="utf-8")
     console.print(f"\n[green]Report written to {report_out}[/green]")
@@ -176,9 +358,11 @@ def ctf(
     findings = FindingsStore(engagement_name=guard.engagement_name)
     agent = build_ctf_agent(router=router, model=model)
 
-    console.print(f"[bold]HexSwarm CTF agent[/bold] analyzing '[yellow]{file}[/yellow]'...")
-    summary = agent.run(goal=goal, target=str(file), guard=guard, findings=findings)
-    console.print(f"\n{summary}")
+    console.print(f"[bold]HexSwarm CTF agent[/bold] analyzing '[yellow]{file}[/yellow]'...\n")
+    with console.status("[bold cyan]Working...[/bold cyan]", spinner="dots"):
+        summary = agent.run(goal=goal, target=str(file), guard=guard, findings=findings)
+
+    console.print(Panel(Markdown(summary), title="RESULT", border_style="green"))
 
 
 if __name__ == "__main__":

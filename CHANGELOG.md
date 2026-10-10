@@ -6,6 +6,20 @@ All notable changes to HexSwarm are documented here. Format loosely follows
 ## [Unreleased]
 
 ### Added
+- `hexswarm init`: an interactive setup wizard that writes a working `.env` and `scope.yaml`
+  from a few guided questions (model choice, in-scope targets, max risk level), instead of
+  requiring a new user to hand-edit `.env.example`/`scope.example.yaml` and already know
+  HexSwarm's config keys and risk-level vocabulary.
+- `hexswarm doctor`: checks whether the configured model is actually reachable (Ollama
+  running? API key set for a cloud provider?) and how many of the built-in tools are
+  installed, so a missing piece is caught before a long `run` does.
+- Live per-phase progress during `run`/`ctf` (a status line while each agent is working, a
+  "done" line per phase) instead of the terminal going silent until the whole thing finishes.
+- `run`/`ctf` output is now rendered as proper Markdown in bordered panels (one per phase,
+  one for the final report) instead of a dump of raw text, matching what the report agent
+  was already asked to write.
+- `Orchestrator(progress_callback=...)` hook so any caller, not just the bundled CLI, can
+  observe phase start/done events.
 - Standalone CTF-solving agent and `hexswarm ctf` command: file identification, string
   extraction, binwalk-style embedded-file scanning, hash identification, and a pure-Python
   multi-codec decoder (base64/base32/hex/URL/ROT13/binary), none of which touch the

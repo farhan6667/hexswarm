@@ -1,6 +1,7 @@
 """Swarm coordinator: runs the phase pipeline end to end for one engagement."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from hexswarm.agents.base import Agent, ConfirmFn
@@ -11,6 +12,11 @@ from hexswarm.memory.knowledge import KnowledgeBase
 from hexswarm.safety.guard import ScopeGuard, ScopeViolation
 
 DEFAULT_PHASE_ORDER = ["recon", "scan", "exploit", "privesc"]
+
+# Called as progress_callback(event, phase) where event is "start" or "done".
+# Lets a CLI show live "Recon agent is working..." feedback instead of going
+# silent for however long a phase's tool-call loop takes.
+ProgressCallback = Callable[[str, str], None]
 
 
 @dataclass
@@ -42,11 +48,13 @@ class Orchestrator:
         confirm_fn: ConfirmFn | None = None,
         models: dict[str, str] | None = None,
         phase_order: list[str] | None = None,
+        progress_callback: ProgressCallback | None = None,
     ) -> None:
         self.router = router
         self.scope_guard = scope_guard
         self.findings = findings or FindingsStore(engagement_name=scope_guard.engagement_name)
         self.phase_order = phase_order or list(DEFAULT_PHASE_ORDER)
+        self.progress_callback = progress_callback
         self.agents: dict[str, Agent] = build_phase_agents(
             router=router,
             knowledge_base=knowledge_base,
@@ -54,6 +62,10 @@ class Orchestrator:
             confirm_fn=confirm_fn,
             models=models,
         )
+
+    def _notify(self, event: str, phase: str) -> None:
+        if self.progress_callback is not None:
+            self.progress_callback(event, phase)
 
     def run(self, goal: str, target: str) -> EngagementResult:
         result = EngagementResult(
@@ -72,13 +84,17 @@ class Orchestrator:
 
         for phase in self.phase_order:
             agent = self.agents[phase]
+            self._notify("start", phase)
             try:
                 summary = agent.run(goal=goal, target=target, guard=self.scope_guard, findings=self.findings)
             except ScopeViolation as exc:
                 summary = f"Phase halted by scope guard: {exc}"
             result.phase_summaries[phase] = summary
+            self._notify("done", phase)
 
+        self._notify("start", "report")
         result.report_markdown = self._generate_report(goal, target)
+        self._notify("done", "report")
         return result
 
     def _generate_report(self, goal: str, target: str) -> str:

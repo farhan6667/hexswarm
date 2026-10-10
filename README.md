@@ -39,6 +39,10 @@ HexSwarm is built around three non-negotiables instead:
 - **Every finding is attributable.** HexSwarm never silently fakes output. If a tool's binary isn't installed on the host, it says so and returns a
   clearly labeled simulated result instead of guessing, so you always know whether a finding came from a real scan or a dry run.
 
+None of that should cost you a rough setup experience: `hexswarm init` writes your config and scope file for you, `hexswarm doctor` tells you what's
+missing before a run does, and `run`/`ctf` show a live status line per phase instead of going silent, then print each phase's output and the final
+report as properly rendered Markdown panels, not a wall of raw text.
+
 ## How it works
 
 HexSwarm runs a linear swarm of five specialized agents, each scoped to only the tools appropriate for its phase:
@@ -81,7 +85,21 @@ URL/ROT13/binary) on anything that looks encoded, chaining its own tool outputs 
 git clone https://github.com/farhan6667/hexswarm.git
 cd hexswarm
 pip install -e .
+hexswarm init
 ```
+
+`hexswarm init` is a guided setup wizard: it asks which model to use (a local Ollama model needs no API key at all), what's in scope, and how
+aggressive the engagement is allowed to get, then writes a working `.env` and `scope.yaml` for you. No hand-editing YAML or memorizing the
+risk-level vocabulary. It ends by printing the exact `hexswarm run` command for what you just configured.
+
+Before pointing it at a real target, run:
+
+```bash
+hexswarm doctor
+```
+
+It checks that your configured model is actually reachable (starts Ollama? has an API key set?) and reports how many of the 17 built-in
+tools are installed on this machine, so you find out about a missing piece before a 20-minute engagement run does.
 
 HexSwarm itself has no heavy dependencies, it's a thin orchestration layer. The underlying security tools (`nmap`, `nuclei`, `gobuster`,
 `sqlmap`, `hydra`, `searchsploit`, Metasploit, plus `file`/`strings`/`binwalk`/`hashid` for CTF mode) are expected to live on a proper pentest

@@ -52,3 +52,39 @@ def test_orchestrator_respects_custom_phase_order():
     )
     result = orchestrator.run(goal="assess", target="example.com")
     assert list(result.phase_summaries.keys()) == ["recon", "scan"]
+
+
+def test_orchestrator_fires_progress_callback_for_every_phase_and_report():
+    def fn(**kwargs):
+        return fake_response("ok")
+
+    events: list[tuple[str, str]] = []
+    router = LLMRouter(primary_model="fake/model", completion_fn=fn)
+    orchestrator = Orchestrator(
+        router=router,
+        scope_guard=make_guard(),
+        phase_order=["recon", "scan"],
+        progress_callback=lambda event, phase: events.append((event, phase)),
+    )
+    orchestrator.run(goal="assess", target="example.com")
+
+    assert events == [
+        ("start", "recon"), ("done", "recon"),
+        ("start", "scan"), ("done", "scan"),
+        ("start", "report"), ("done", "report"),
+    ]
+
+
+def test_orchestrator_never_fires_progress_callback_on_scope_abort():
+    def fn(**kwargs):
+        return fake_response("should not run")
+
+    events: list[tuple[str, str]] = []
+    router = LLMRouter(primary_model="fake/model", completion_fn=fn)
+    orchestrator = Orchestrator(
+        router=router,
+        scope_guard=make_guard(),
+        progress_callback=lambda event, phase: events.append((event, phase)),
+    )
+    orchestrator.run(goal="assess", target="totally-unauthorized.com")
+    assert events == []
