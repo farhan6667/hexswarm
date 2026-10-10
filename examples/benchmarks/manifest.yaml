@@ -1,0 +1,41 @@
+# HexSwarm's own small CTF-style self-check, in the spirit of Cybench/NYU-CTF
+# but tiny, local, and offline: no Docker, no network, runs against whatever
+# model you've configured. `hexswarm bench` runs the CTF agent against every
+# challenge here and reports how many it actually solved, so a version's
+# capability claim is a number, not a vibe.
+#
+# Every flag is genuinely encoded the way its id says (see the generation
+# script in CONTRIBUTING.md if you want to regenerate or add more), and every
+# one was independently verified solvable by decode_text before being
+# committed here.
+
+challenges:
+  - id: base64-simple
+    file: base64_simple.txt
+    goal: "Find the flag in this file."
+    flag: "flag{base64_is_not_encryption}"
+
+  - id: hex-simple
+    file: hex_simple.txt
+    goal: "Find the flag in this file."
+    flag: "flag{hex_decoding_101}"
+
+  - id: rot13-simple
+    file: rot13_simple.txt
+    goal: "Find the flag in this file."
+    flag: "flag{caesar_cipher_classic}"
+
+  - id: base32-simple
+    file: base32_simple.txt
+    goal: "Find the flag in this file."
+    flag: "flag{base32_is_also_not_encryption}"
+
+  - id: url-encoded
+    file: url_encoded.txt
+    goal: "Find the flag in this file."
+    flag: "flag{percent_encoding_trick}"
+
+  - id: double-base64
+    file: double_base64.txt
+    goal: "Find the flag in this file. It may be encoded more than once, check your own tool output again if the first decode doesn't look like a flag."
+    flag: "flag{layers_of_encoding}"

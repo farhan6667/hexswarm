@@ -1,0 +1,32 @@
+# Example external MCP server config for `hexswarm run`/`hexswarm ctf` (via
+# --mcp-config) to pull in tools from other MCP servers, in addition to the
+# built-in registry. Copy this file, edit it, and point an agent at it.
+#
+# HexSwarm doesn't know what an arbitrary external tool actually does, so the
+# operator declares the risk tier and scope-check behavior per server when
+# adding it, the same trust decision you'd make adding any new tool.
+
+servers:
+  - name: local-hexswarm
+    # This example just points back at HexSwarm's own MCP server, so you can
+    # try the client against something real without installing anything else.
+    command: hexswarm
+    args: ["mcp-server", "--scope", "scope.yaml"]
+    risk_level: "intrusive"      # applied to every tool on this server by default
+    requires_scope_check: true
+    # Tool names on this server whose "target" isn't a network host (a local
+    # file path, a search string, ...). These skip the host-scope check, the
+    # same way requires_scope_check=False works on a local Tool.
+    non_scope_checked_tools:
+      - "decode_text"
+      - "file_identify"
+      - "string_extract"
+      - "binwalk_scan"
+      - "hash_identify"
+      - "exploit_search"
+
+  # - name: pentestmcp
+  #   command: python
+  #   args: ["-m", "pentestmcp"]
+  #   risk_level: "exploit"
+  #   requires_scope_check: true

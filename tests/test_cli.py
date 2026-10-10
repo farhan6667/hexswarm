@@ -180,3 +180,37 @@ def test_doctor_checks_cloud_provider_api_key(monkeypatch):
     result_ok = runner.invoke(app, ["doctor"])
     assert result_ok.exit_code == 0
     assert "Ready to run" in result_ok.stdout
+
+
+def test_mcp_server_command_rejects_missing_scope(tmp_path):
+    result = runner.invoke(app, ["mcp-server", "--scope", str(tmp_path / "nope.yaml")])
+    assert result.exit_code == 1
+    assert "Scope error" in result.stdout
+
+
+def test_bench_command_runs_end_to_end(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from hexswarm.bench import load_challenges
+    from hexswarm.llm.router import LLMRouter
+
+    # Script the fake model to answer each challenge, in manifest order, with that
+    # challenge's own real flag, proving a genuinely correct model is scored 6/6.
+
+    challenges = load_challenges("examples/benchmarks/manifest.yaml")
+    flags_in_order = iter(c.flag for c in challenges)
+
+    def fake_completion_fn_all_correct(**kwargs):
+        content = next(flags_in_order, "no idea")
+        message = SimpleNamespace(content=content, tool_calls=[])
+        return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    monkeypatch.setattr(LLMRouter, "_get_completion_fn", lambda self: fake_completion_fn_all_correct)
+
+    report_out = tmp_path / "bench_report.md"
+    result = runner.invoke(app, ["bench", "--report-out", str(report_out)])
+
+    assert result.exit_code == 0, result.stdout
+    assert "6/6 solved" in result.stdout
+    assert report_out.exists()
+    assert "6/6 solved" in report_out.read_text(encoding="utf-8")

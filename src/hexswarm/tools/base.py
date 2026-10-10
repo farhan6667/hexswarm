@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 
 from hexswarm.safety.guard import ScopeGuard, ToolRiskLevel
+from hexswarm.tools.sandbox import current_sandbox, wrap_command
 
 
 @dataclass
@@ -87,6 +88,12 @@ class Tool(ABC):
     def is_available(self) -> bool:
         if self.local_only:
             return True  # pure Python, never shells out, never "missing"
+        if current_sandbox().is_docker:
+            # The binary lives inside the sandbox image, not on this host, so a host-side
+            # `which` check is meaningless here. A genuinely missing binary still surfaces
+            # correctly: `docker run` succeeds, the command inside it fails, and that comes
+            # back as a real (non-simulated) failed ToolResult rather than a false "missing".
+            return True
         return shutil.which(self.binary) is not None
 
     def build_command(self, **kwargs: Any) -> list[str]:
@@ -141,21 +148,23 @@ class Tool(ABC):
                 )
 
         command = self.build_command(**kwargs)
-        command_str = shlex.join(command)
 
         if not self.is_available():
             return ToolResult(
                 tool_name=self.name,
                 target=target,
-                command=command_str,
+                command=shlex.join(command),
                 simulated=True,
                 success=True,
                 output=self.simulate(command, **kwargs),
             )
 
+        executed_command = wrap_command(command)
+        command_str = shlex.join(executed_command)
+
         try:
             proc = subprocess.run(
-                command,
+                executed_command,
                 capture_output=True,
                 text=True,
                 timeout=self.timeout_seconds,

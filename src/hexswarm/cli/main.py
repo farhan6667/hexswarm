@@ -14,10 +14,11 @@ from rich.table import Table
 from hexswarm import __version__
 from hexswarm.agents.orchestrator import Orchestrator
 from hexswarm.agents.specialized import build_ctf_agent
-from hexswarm.config import load_settings
+from hexswarm.config import Settings, load_settings
 from hexswarm.llm.router import LLMRouter
 from hexswarm.safety.guard import ScopeGuard, ScopeViolation, ToolRiskLevel
 from hexswarm.tools.base import ToolRegistry
+from hexswarm.tools.sandbox import configure_sandbox
 
 app = typer.Typer(
     name="hexswarm",
@@ -25,6 +26,14 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 console = Console()
+
+
+def _apply_sandbox(settings: Settings) -> None:
+    configure_sandbox(
+        mode=settings.sandbox_mode,
+        image=settings.sandbox_image,
+        network=settings.sandbox_network,
+    )
 
 RISK_LEVEL_CHOICES = ["read_only", "active_recon", "intrusive", "exploit", "post_exploit"]
 
@@ -152,6 +161,7 @@ def init(
 def doctor() -> None:
     """Check whether HexSwarm is actually ready to run: model reachable, tools installed."""
     settings = load_settings()
+    _apply_sandbox(settings)
     all_ok = True
 
     console.print(Panel.fit("[bold]HexSwarm doctor[/bold]", border_style="cyan"))
@@ -263,6 +273,7 @@ def run(
 ) -> None:
     """Run the full recon -> scan -> exploit -> privesc -> report swarm against a target."""
     settings = load_settings()
+    _apply_sandbox(settings)
     try:
         guard = ScopeGuard.from_file(scope_file)
     except (FileNotFoundError, ValueError) as exc:
@@ -352,6 +363,7 @@ def ctf(
         raise typer.Exit(code=1)
 
     settings = load_settings()
+    _apply_sandbox(settings)
     router = LLMRouter(
         primary_model=model or settings.primary_model,
         fallback_models=settings.fallback_models,
@@ -375,6 +387,86 @@ def ctf(
         summary = agent.run(goal=goal, target=str(file), guard=guard, findings=findings)
 
     console.print(Panel(Markdown(summary), title="RESULT", border_style="green"))
+
+
+@app.command(name="mcp-server")
+def mcp_server(
+    scope_file: Path = typer.Option(..., "--scope", "-s", help="Path to a scope YAML file."),
+) -> None:
+    """Expose every registered tool as an MCP server over stdio.
+
+    Point any MCP client (Claude Desktop, Claude Code, etc.) at this command. Every tool
+    call it makes is still checked against the given scope file before it runs, there is no
+    separate, looser code path for the MCP transport.
+    """
+    from hexswarm.mcp.server import build_server
+
+    _apply_sandbox(load_settings())
+
+    try:
+        guard = ScopeGuard.from_file(scope_file)
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"[red]Scope error[/red]: {exc}")
+        raise typer.Exit(code=1)
+
+    server = build_server(guard)
+    server.run()
+
+
+@app.command()
+def bench(
+    manifest: Path = typer.Option(
+        Path("examples/benchmarks/manifest.yaml"), "--manifest", "-m",
+        help="Path to a benchmark manifest.yaml.",
+    ),
+    model: str = typer.Option(None, "--model", help="Override the primary LLM model string."),
+    report_out: Path = typer.Option(
+        Path("BENCHMARK_RESULTS.md"), "--report-out", help="Where to write the Markdown report."
+    ),
+) -> None:
+    """Run the CTF agent against HexSwarm's own small local benchmark suite.
+
+    One honest, reproducible number per model/version instead of a vibe: anyone can clone
+    the repo and run this same command against the same challenges.
+    """
+    from hexswarm.bench import load_challenges, run_benchmark
+    from hexswarm.safety.guard import ToolRiskLevel
+
+    settings = load_settings()
+    _apply_sandbox(settings)
+
+    try:
+        challenges = load_challenges(manifest)
+    except FileNotFoundError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1)
+
+    router = LLMRouter(
+        primary_model=model or settings.primary_model,
+        fallback_models=settings.fallback_models,
+        temperature=settings.temperature,
+    )
+
+    def agent_factory():
+        return build_ctf_agent(router=router, model=model)
+
+    def guard_factory():
+        return ScopeGuard(
+            engagement_name="bench", allow=["local-file-analysis"], max_risk_level=ToolRiskLevel.READ_ONLY
+        )
+
+    console.print(f"[bold]Running {len(challenges)} benchmark challenges against "
+                  f"'{model or settings.primary_model}'...[/bold]\n")
+    with console.status("[bold cyan]Working...[/bold cyan]", spinner="dots"):
+        report = run_benchmark(challenges, agent_factory, guard_factory)
+
+    for result in report.results:
+        mark = "[green]PASS[/green]" if result.solved else "[red]FAIL[/red]"
+        console.print(f"  {mark}  {result.challenge_id}")
+
+    console.print(f"\n[bold]{report.solved_count}/{report.total_count} solved[/bold]")
+    report_out.write_text(report.to_markdown(), encoding="utf-8")
+    console.print(f"[green]Report written to {report_out}[/green]")
 
 
 if __name__ == "__main__":

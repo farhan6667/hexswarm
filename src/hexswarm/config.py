@@ -35,6 +35,17 @@ class Settings:
     max_steps_per_phase: int = field(
         default_factory=lambda: int(os.getenv("HEXSWARM_MAX_STEPS", "6"))
     )
+    sandbox_mode: str = field(
+        default_factory=lambda: os.getenv("HEXSWARM_SANDBOX", "host")
+    )
+    sandbox_image: str = field(
+        default_factory=lambda: os.getenv(
+            "HEXSWARM_SANDBOX_IMAGE", "ghcr.io/farhan6667/hexswarm-toolchain:latest"
+        )
+    )
+    sandbox_network: str = field(
+        default_factory=lambda: os.getenv("HEXSWARM_SANDBOX_NETWORK", "none")
+    )
 
 
 def load_settings() -> Settings:
