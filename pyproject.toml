@@ -41,6 +41,10 @@ dev = [
     "pytest-mock>=3.14.0",
     "ruff>=0.6.0",
     "mypy>=1.10.0",
+    # Not a direct hexswarm dependency, but CI's hosted runner images preinstall an older
+    # setuptools that pip-audit correctly flags (PYSEC-2026-3447, fixed in 83.0.0). Pinning
+    # it here forces the patched version into the same environment pip-audit scans.
+    "setuptools>=83.0.0",
 ]
 
 [project.urls]
