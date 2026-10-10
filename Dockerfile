@@ -20,6 +20,7 @@
 # inside the container too.
 
 FROM python:3.12-slim AS base
+LABEL org.opencontainers.image.source="https://github.com/farhan6667/hexswarm"       org.opencontainers.image.description="A swarm-of-agents framework for AI-driven offensive security research, pentesting labs, and CTF solving."       org.opencontainers.image.licenses="Apache-2.0"       org.opencontainers.image.authors="Syed Farhan Ahmed (SFA), NexaForge"
 # To run real tools inside the container instead of simulate mode, swap the
 # line above for a pentest-toolchain base image, e.g.:
 #   FROM kalilinux/kali-rolling
