@@ -13,7 +13,7 @@ from rich.table import Table
 
 from hexswarm import __version__
 from hexswarm.agents.orchestrator import Orchestrator
-from hexswarm.agents.specialized import build_ctf_agent
+from hexswarm.agents.specialized import build_ai_security_agent, build_ctf_agent
 from hexswarm.config import Settings, load_settings
 from hexswarm.llm.router import LLMRouter
 from hexswarm.safety.guard import ScopeGuard, ScopeViolation, ToolRiskLevel
@@ -385,6 +385,49 @@ def ctf(
     console.print(f"[bold]HexSwarm CTF agent[/bold] analyzing '[yellow]{file}[/yellow]'...\n")
     with console.status("[bold cyan]Working...[/bold cyan]", spinner="dots"):
         summary = agent.run(goal=goal, target=str(file), guard=guard, findings=findings)
+
+    console.print(Panel(Markdown(summary), title="RESULT", border_style="green"))
+
+
+@app.command(name="ai-audit")
+def ai_audit(
+    goal: str = typer.Option(
+        "Probe this endpoint for prompt-injection and system-prompt-leak weaknesses.",
+        "--goal", "-g",
+    ),
+    target: str = typer.Option(..., "--target", "-t", help="Target LLM/chat HTTP endpoint URL."),
+    scope_file: Path = typer.Option(..., "--scope", "-s", help="Path to a scope YAML file."),
+    model: str = typer.Option(None, "--model", help="Override the primary LLM model string."),
+) -> None:
+    """Probe a target LLM/chat application's HTTP endpoint for prompt-injection weaknesses.
+
+    The target is a real network endpoint, so a scope file is required, same as `run`.
+    Flagged responses are heuristic hits for a human to review, not confirmed findings.
+    """
+    settings = load_settings()
+    _apply_sandbox(settings)
+
+    try:
+        guard = ScopeGuard.from_file(scope_file)
+        guard.check_target(target)
+    except (FileNotFoundError, ValueError, ScopeViolation) as exc:
+        console.print(f"[red]Scope error[/red]: {exc}")
+        raise typer.Exit(code=1)
+
+    router = LLMRouter(
+        primary_model=model or settings.primary_model,
+        fallback_models=settings.fallback_models,
+        temperature=settings.temperature,
+    )
+
+    from hexswarm.memory.findings import FindingsStore
+
+    findings = FindingsStore(engagement_name=guard.engagement_name)
+    agent = build_ai_security_agent(router=router, model=model)
+
+    console.print(f"[bold]HexSwarm AI Security agent[/bold] probing '[yellow]{target}[/yellow]'...\n")
+    with console.status("[bold cyan]Working...[/bold cyan]", spinner="dots"):
+        summary = agent.run(goal=goal, target=target, guard=guard, findings=findings)
 
     console.print(Panel(Markdown(summary), title="RESULT", border_style="green"))
 

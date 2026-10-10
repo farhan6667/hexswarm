@@ -1,8 +1,11 @@
-# Curated attack-surface checklists, keyed by lowercase service/banner substring.
-# Checklist items are investigative prompts, not exploit code. Extend this file
-# freely for your own environment and tech stack.
+# Curated attack-surface checklists, keyed by service. Each entry's `aliases`
+# are the product names/banner substrings that should surface it during a
+# lookup; the key itself is always included automatically. Checklist items
+# are investigative prompts, not exploit code. Extend this file freely for
+# your own environment and tech stack.
 
 ftp:
+  aliases: ["vsftpd", "proftpd", "pure-ftpd", "filezilla"]
   checklist:
     - "Check whether anonymous FTP login is permitted."
     - "Check the reported FTP server/version against known CVEs (vsftpd 2.3.4 backdoor, ProFTPD mod_copy, etc.) via exploit_search."
@@ -11,6 +14,7 @@ ftp:
     - "https://nvd.nist.gov/vuln/search?query=ftp"
 
 ssh:
+  aliases: ["openssh", "libssh", "dropbear"]
   checklist:
     - "Check for weak or default credentials, and whether password auth is even enabled."
     - "Check SSH server version against known CVEs (e.g. libssh auth bypass, Regress4j)."
@@ -19,6 +23,7 @@ ssh:
     - "https://nvd.nist.gov/vuln/search?query=openssh"
 
 smb:
+  aliases: ["samba", "netbios", "cifs"]
   checklist:
     - "Check for null session / anonymous SMB access."
     - "Check SMB signing status; unsigned SMB enables relay attacks."
@@ -27,6 +32,7 @@ smb:
     - "https://nvd.nist.gov/vuln/search?query=smb"
 
 http:
+  aliases: ["apache", "nginx", "iis", "lighttpd"]
   checklist:
     - "Fingerprint the stack (server header, framework, CMS) before choosing payloads."
     - "Check for default/backup files: .git, .env, backup.zip, config.php.bak."
@@ -36,6 +42,7 @@ http:
     - "https://owasp.org/www-project-top-ten/"
 
 mysql:
+  aliases: ["mariadb", "percona"]
   checklist:
     - "Check for remote root access with blank or default password."
     - "Check mysql version against known privilege-escalation / RCE CVEs."
@@ -43,8 +50,95 @@ mysql:
     - "https://nvd.nist.gov/vuln/search?query=mysql"
 
 rdp:
+  aliases: ["remote desktop", "terminal services", "mstsc"]
   checklist:
     - "Check patch level against BlueKeep (CVE-2019-0708) and subsequent RDP RCEs."
     - "Check whether Network Level Authentication (NLA) is enforced."
   references:
     - "https://nvd.nist.gov/vuln/search?query=rdp"
+
+postgresql:
+  aliases: ["postgres", "pgsql"]
+  checklist:
+    - "Check pg_hba.conf-equivalent trust settings; a trust/md5-only setup with a known port exposed is a common misconfiguration."
+    - "Check for default credentials on the postgres superuser account."
+    - "Check version against known privilege-escalation CVEs (e.g. extension-loading RCEs)."
+  references:
+    - "https://nvd.nist.gov/vuln/search?query=postgresql"
+
+redis:
+  aliases: ["redis-server"]
+  checklist:
+    - "Check whether the instance requires authentication at all; unauthenticated Redis is a classic RCE path via module loading or cron-file writes."
+    - "Check whether it's bound to a public interface instead of localhost."
+  references:
+    - "https://nvd.nist.gov/vuln/search?query=redis"
+
+mongodb:
+  aliases: ["mongo"]
+  checklist:
+    - "Check whether authentication is enabled at all; historically Mongo defaulted to none."
+    - "Check for publicly exposed instances with no network-level restriction."
+  references:
+    - "https://nvd.nist.gov/vuln/search?query=mongodb"
+
+elasticsearch:
+  aliases: ["elastic", "kibana", "opensearch"]
+  checklist:
+    - "Check whether the REST API requires authentication; an open instance leaks or allows deletion of all indexed data."
+    - "Check for known deserialization/script-engine RCEs matching the reported version."
+  references:
+    - "https://nvd.nist.gov/vuln/search?query=elasticsearch"
+
+jenkins:
+  aliases: ["hudson"]
+  checklist:
+    - "Check whether the script console is reachable without authentication, groovy script execution there is a direct RCE."
+    - "Check for anonymous read/build permissions on jobs that might leak credentials in build logs."
+  references:
+    - "https://nvd.nist.gov/vuln/search?query=jenkins"
+
+docker-api:
+  aliases: ["docker remote api", "dockerd"]
+  checklist:
+    - "Check whether the Docker daemon's TCP API is reachable without TLS client-cert auth; that's a direct path to running arbitrary containers on the host."
+  references:
+    - "https://nvd.nist.gov/vuln/search?query=docker"
+
+kubernetes-api:
+  aliases: ["kube-apiserver", "k8s api"]
+  checklist:
+    - "Check whether the API server allows anonymous/unauthenticated requests."
+    - "Check RBAC bindings for over-broad permissions (cluster-admin on a default service account, etc.)."
+  references:
+    - "https://nvd.nist.gov/vuln/search?query=kubernetes"
+
+telnet:
+  aliases: []
+  checklist:
+    - "Telnet transmits credentials in cleartext; check for default/vendor credentials on embedded devices."
+  references:
+    - "https://nvd.nist.gov/vuln/search?query=telnet"
+
+vnc:
+  aliases: ["realvnc", "tightvnc", "ultravnc"]
+  checklist:
+    - "Check whether a password is set at all; several VNC implementations have shipped with authentication-bypass CVEs."
+  references:
+    - "https://nvd.nist.gov/vuln/search?query=vnc"
+
+snmp:
+  aliases: ["simple network management protocol"]
+  checklist:
+    - "Check for default community strings (public/private) with read or write access."
+    - "SNMP v1/v2c sends the community string in cleartext; check whether v3 with auth/privacy is available instead."
+  references:
+    - "https://nvd.nist.gov/vuln/search?query=snmp"
+
+wordpress:
+  aliases: ["wp-content", "wp-admin"]
+  checklist:
+    - "Check for outdated plugins/themes via their changelog or readme.txt version string."
+    - "Check for username enumeration via the REST API or author archive pages."
+  references:
+    - "https://wpscan.com/"

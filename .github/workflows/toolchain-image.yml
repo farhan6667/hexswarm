@@ -1,0 +1,74 @@
+name: toolchain-image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Dockerfile.toolchain"
+      - ".github/workflows/toolchain-image.yml"
+  schedule:
+    # Weekly, so a drifted Kali package (nmap/nuclei/etc. renamed or dropped)
+    # gets caught even on weeks nobody touches the Dockerfile.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the toolchain image
+        run: docker build -f Dockerfile.toolchain -t hexswarm-toolchain:ci .
+
+      - name: Smoke test - hexswarm itself runs
+        run: docker run --rm hexswarm-toolchain:ci version
+
+      - name: Smoke test - real toolchain binaries are actually installed
+        run: |
+          docker run --rm hexswarm-toolchain:ci tools > tools_output.txt
+          cat tools_output.txt
+          # Every one of these must show "yes", not "simulate mode": this is the whole
+          # point of the toolchain image, and a regression here means a package the
+          # Dockerfile asked apt to install silently stopped being installed.
+          for tool in nmap gobuster sqlmap hydra searchsploit whois subfinder whatweb file hashid; do
+            grep -q "$tool.*yes" tools_output.txt || { echo "::error::$tool is not reporting installed"; exit 1; }
+          done
+
+      - name: Smoke test - a real tool actually executes against a real target
+        run: |
+          # scanme.nmap.org is nmap's own public test target, explicitly offered for
+          # exactly this kind of scan. This calls port_scan directly through the real
+          # ToolRegistry inside the real toolchain image, not a unit test with the
+          # subprocess mocked out, and asserts the result was NOT simulated: nmap is
+          # genuinely installed and genuinely ran.
+          docker run --rm hexswarm-toolchain:ci python3 -c "
+          from hexswarm.tools.base import ToolRegistry
+          from hexswarm.safety.guard import ScopeGuard, ToolRiskLevel
+
+          guard = ScopeGuard(engagement_name='ci-smoke', allow=['scanme.nmap.org'], max_risk_level=ToolRiskLevel.ACTIVE_RECON)
+          tool = ToolRegistry.get('port_scan')
+          result = tool.run(guard, target='scanme.nmap.org', ports='22')
+          print(result.output)
+          assert result.simulated is False, 'nmap did not actually run, still in simulate mode'
+          assert 'nmap' in result.command
+          print('REAL TOOL EXECUTION CONFIRMED')
+          "
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push the toolchain image
+        if: github.event_name != 'pull_request'
+        run: |
+          docker tag hexswarm-toolchain:ci ghcr.io/${{ github.repository }}-toolchain:latest
+          docker push ghcr.io/${{ github.repository }}-toolchain:latest

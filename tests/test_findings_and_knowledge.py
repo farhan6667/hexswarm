@@ -47,3 +47,46 @@ def test_knowledge_base_custom_path(tmp_path):
     hits = kb.lookup("running widgetd 1.0")
     assert len(hits) == 1
     assert hits[0].checklist == ["check default creds"]
+
+
+def test_knowledge_base_matches_via_alias_not_just_service_key():
+    kb = KnowledgeBase()
+    # "openssh" never appears as the dict key ("ssh" does), only as an alias.
+    hits = kb.lookup("SSH-2.0-OpenSSH_8.9p1 Ubuntu")
+    assert any(h.service == "ssh" for h in hits)
+
+
+def test_knowledge_base_ranks_more_alias_matches_higher(tmp_path):
+    custom = tmp_path / "hints.yaml"
+    custom.write_text(
+        "generic:\n"
+        "  aliases: ['service']\n"
+        "  checklist: ['generic check']\n"
+        "specific:\n"
+        "  aliases: ['service', 'specificproduct']\n"
+        "  checklist: ['specific check']\n",
+        encoding="utf-8",
+    )
+    kb = KnowledgeBase(path=custom)
+    hits = kb.lookup("running specificproduct, a service")
+    assert [h.service for h in hits] == ["specific", "generic"]
+
+
+def test_knowledge_base_lookup_respects_top_k(tmp_path):
+    custom = tmp_path / "hints.yaml"
+    custom.write_text(
+        "a:\n  aliases: ['shared']\n  checklist: ['x']\n"
+        "b:\n  aliases: ['shared']\n  checklist: ['x']\n"
+        "c:\n  aliases: ['shared']\n  checklist: ['x']\n",
+        encoding="utf-8",
+    )
+    kb = KnowledgeBase(path=custom)
+    hits = kb.lookup("shared service banner", top_k=2)
+    assert len(hits) == 2
+
+
+def test_knowledge_base_has_a_broad_corpus():
+    kb = KnowledgeBase()
+    services = kb.all_services()
+    for expected in ["ftp", "ssh", "smb", "http", "postgresql", "redis", "mongodb", "jenkins"]:
+        assert expected in services

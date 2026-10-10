@@ -1,0 +1,52 @@
+# The real pentest-toolchain image: this is what HEXSWARM_SANDBOX_IMAGE points
+# at by default (see src/hexswarm/tools/sandbox.py), and what `docker run
+# ghcr.io/farhan6667/hexswarm-toolchain hexswarm tools` reports every tool as
+# actually installed against, instead of simulate mode.
+#
+# Build:   docker build -f Dockerfile.toolchain -t hexswarm-toolchain .
+# Smoke:   docker run --rm hexswarm-toolchain hexswarm tools
+#
+# This is deliberately a *separate* image from the plain Dockerfile: most
+# people running HexSwarm don't need a 1+ GB Kali-based image with a full
+# exploit toolchain just to orchestrate agents, and CI builds/smoke-tests
+# this one on its own schedule (see .github/workflows/toolchain-image.yml)
+# since it's slow to build and not something every push needs to rebuild.
+
+FROM kalilinux/kali-rolling
+
+LABEL org.opencontainers.image.source="https://github.com/farhan6667/hexswarm" \
+      org.opencontainers.image.description="HexSwarm with the real offensive-security toolchain installed (nmap, nuclei, gobuster, sqlmap, hydra, metasploit, searchsploit, whois, subfinder, whatweb, file, binutils, hashid)." \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.authors="Syed Farhan Ahmed (SFA), NexaForge"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3 python3-pip python3-venv \
+        nmap \
+        nuclei \
+        gobuster \
+        sqlmap \
+        hydra \
+        metasploit-framework \
+        exploitdb \
+        whois \
+        subfinder \
+        whatweb \
+        binutils \
+        file \
+        hashid \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd --create-home --shell /bin/bash hexswarm
+WORKDIR /app
+
+COPY pyproject.toml README.md ./
+COPY src ./src
+RUN pip install --no-cache-dir --break-system-packages .
+
+USER hexswarm
+WORKDIR /work
+
+ENTRYPOINT ["hexswarm"]
+CMD ["--help"]

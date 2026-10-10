@@ -214,3 +214,61 @@ def test_bench_command_runs_end_to_end(tmp_path, monkeypatch):
     assert "6/6 solved" in result.stdout
     assert report_out.exists()
     assert "6/6 solved" in report_out.read_text(encoding="utf-8")
+
+
+def test_ai_audit_rejects_out_of_scope_target(tmp_path):
+    scope = tmp_path / "scope.yaml"
+    scope.write_text(
+        "engagement_name: demo\nallow:\n  - 'app.example.com'\nmax_risk_level: intrusive\n",
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app, ["ai-audit", "--target", "https://evil.other.com/api/chat", "--scope", str(scope)]
+    )
+    assert result.exit_code == 1
+    assert "Scope error" in result.stdout
+
+
+def test_ai_audit_runs_end_to_end(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from hexswarm.llm.router import LLMRouter
+
+    scope = tmp_path / "scope.yaml"
+    scope.write_text(
+        "engagement_name: demo\nallow:\n  - 'app.example.com'\nmax_risk_level: intrusive\n",
+        encoding="utf-8",
+    )
+
+    def fake_post(url, json=None, timeout=None):
+        class R:
+            def json(self_inner):
+                return {"response": "I can't help with that."}
+        return R()
+
+    monkeypatch.setattr("hexswarm.tools.ai_security.requests.post", fake_post)
+
+    call_count = {"n": 0}
+
+    def fake_completion_fn_sequenced(**kwargs):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            tc = SimpleNamespace(
+                id="c1",
+                function=SimpleNamespace(
+                    name="prompt_injection_probe",
+                    arguments='{"target": "https://app.example.com/api/chat"}',
+                ),
+            )
+            message = SimpleNamespace(content="", tool_calls=[tc])
+        else:
+            message = SimpleNamespace(content="No probes were flagged.", tool_calls=[])
+        return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    monkeypatch.setattr(LLMRouter, "_get_completion_fn", lambda self: fake_completion_fn_sequenced)
+
+    result = runner.invoke(
+        app, ["ai-audit", "--target", "https://app.example.com/api/chat", "--scope", str(scope)]
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "No probes were flagged" in result.stdout

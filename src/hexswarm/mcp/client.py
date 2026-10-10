@@ -189,6 +189,6 @@ def load_all_remote_tools(config_path: str | Path) -> list[RemoteMCPTool]:
     for server in load_mcp_server_configs(config_path):
         try:
             tools.extend(MCPToolClient(server).list_tools())
-        except Exception:  # noqa: BLE001, S112 - a bad external server shouldn't break startup
+        except Exception:  # noqa: BLE001, S112 # nosec B112 - a bad external server shouldn't break startup
             continue
     return tools

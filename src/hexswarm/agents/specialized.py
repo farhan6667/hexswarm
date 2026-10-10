@@ -133,3 +133,34 @@ def build_ctf_agent(
         max_steps=max_steps,
     )
     return Agent(config=config, router=router)
+
+
+AI_SECURITY_PROMPT = """You are the AI Security agent in HexSwarm. Your job: probe a target
+LLM/chat application's HTTP endpoint for prompt-injection and system-prompt-leak
+weaknesses using prompt_injection_probe. A flagged response is a heuristic hit, not a
+confirmed finding: read the actual response text in the tool output and judge for yourself
+whether it really complied with the injected instruction before reporting it as a concern.
+Summarize which probes were flagged, quote the relevant part of each flagged response, and
+note that this is triage, not a substitute for manual review."""
+
+
+def build_ai_security_agent(
+    router: LLMRouter,
+    model: str | None = None,
+    max_steps: int = 4,
+) -> Agent:
+    """Builds the standalone AI/LLM application security agent (category='ai-security').
+
+    Separate from the network pentest pipeline for the same reason the CTF agent is:
+    its one tool targets an application's chat endpoint specifically, not a general host.
+    """
+    tools = list(ToolRegistry.for_category("ai-security").values())
+    config = AgentConfig(
+        name="ai_security_agent",
+        phase="ai-security",
+        system_prompt=AI_SECURITY_PROMPT,
+        tools=tools,
+        model=model,
+        max_steps=max_steps,
+    )
+    return Agent(config=config, router=router)

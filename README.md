@@ -111,6 +111,69 @@ hexswarm ctf --goal "find the flag in this binary" --file ./challenge.bin
 The CTF agent identifies the file type, pulls printable strings, checks for embedded data, and tries common encodings (Base64/Base32/hex/
 URL/ROT13/binary) on anything that looks encoded, chaining its own tool outputs together until it finds a flag or runs out of obvious angles.
 
+### AI/LLM application testing
+
+An AI-native framework testing other AI-native applications is a natural fit, and AI-in-scope bug bounty programs grew 270% in HackerOne's
+2025 data. This probes a target chat/LLM HTTP endpoint for prompt-injection and system-prompt-leak weaknesses, same scope-file requirement as `run`:
+
+```bash
+hexswarm ai-audit --target https://app.example.com/api/chat --scope scope.yaml
+```
+
+A flagged response is a text-pattern heuristic hit, worth a human reading the actual reply, not a confirmed vulnerability. Read it the same
+way you'd read any other scanner's output here.
+
+### MCP: use HexSwarm's tools from any MCP client, or pull in someone else's
+
+[MCP](https://modelcontextprotocol.io/) is where AI-driven security tooling is heading in 2026: Kali Linux now ships a native MCP-based Claude
+workflow, and projects like PentestMCP expose pentest tooling the same way. HexSwarm speaks MCP in both directions.
+
+Expose every HexSwarm tool to Claude Desktop, Claude Code, or any other MCP client:
+
+```bash
+hexswarm mcp-server --scope scope.yaml
+```
+
+Every call still goes through the exact same `ScopeGuard` as the CLI and the built-in agents: MCP is a different transport for the same
+gated tool registry, not a looser path around it.
+
+Pull tools from someone else's MCP server into a HexSwarm agent, via a small YAML config (see
+[`examples/mcp_servers.example.yaml`](examples/mcp_servers.example.yaml)):
+
+```yaml
+servers:
+  - name: pentestmcp
+    command: python
+    args: ["-m", "pentestmcp"]
+    risk_level: "exploit"
+```
+
+HexSwarm doesn't know what an arbitrary external tool actually does, so you declare the risk tier (and, per tool, whether its target is even
+a network host) when you add the server, the same trust decision as adding any new tool.
+
+### Sandboxing each tool call in its own container
+
+By default every tool runs as a plain subprocess on the host, same as always. Setting `HEXSWARM_SANDBOX=docker` switches every tool call to
+run inside its own disposable `docker run --rm` instead: one fresh container per call, isolated from the host, from HexSwarm itself, and from
+every other tool call in the run. That's a meaningfully different safety posture than "the whole app happens to run inside a Dockerfile."
+
+```bash
+HEXSWARM_SANDBOX=docker HEXSWARM_SANDBOX_IMAGE=ghcr.io/farhan6667/hexswarm-toolchain:latest hexswarm run ...
+```
+
+`ghcr.io/farhan6667/hexswarm-toolchain` (built from [`Dockerfile.toolchain`](Dockerfile.toolchain)) is a Kali-based image with the real
+toolchain installed: `hexswarm tools` reports every binary as actually present when run inside it, not simulate mode.
+
+### Benchmarking a model/version
+
+```bash
+hexswarm bench
+```
+
+Runs the CTF agent against a small local CTF-style challenge set ([`examples/benchmarks/`](examples/benchmarks/)) and reports a pass count,
+in the spirit of Cybench/NYU-CTF Bench but tiny and fully offline: "solved 5/6" is a number anyone can reproduce by cloning the repo and
+running the same command against the same challenges, not a vibe.
+
 ## Install
 
 ```bash
@@ -130,7 +193,7 @@ Before pointing it at a real target, run:
 hexswarm doctor
 ```
 
-It checks that your configured model is actually reachable (starts Ollama? has an API key set?) and reports how many of the 17 built-in
+It checks that your configured model is actually reachable (starts Ollama? has an API key set?) and reports how many of the built-in
 tools are installed on this machine, so you find out about a missing piece before a 20-minute engagement run does.
 
 HexSwarm itself has no heavy dependencies, it's a thin orchestration layer. The underlying security tools (`nmap`, `nuclei`, `gobuster`,
