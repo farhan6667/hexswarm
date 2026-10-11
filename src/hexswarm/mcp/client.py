@@ -87,7 +87,14 @@ def load_mcp_server_configs(path: str | Path) -> list[McpServerConfig]:
 
 
 class RemoteMCPTool:
-    """Duck-typed stand-in for `hexswarm.tools.base.Tool`, backed by one remote MCP tool."""
+    """Duck-typed stand-in for `hexswarm.tools.base.Tool`, backed by one remote MCP tool.
+
+    Not a Tool subclass on purpose: Tool's fields are ClassVars (shared per subclass), but
+    every RemoteMCPTool needs its own per-instance name/risk/category/schema, so it
+    implements the same interface structurally instead (name, description, risk_level,
+    category, requires_scope_check, is_available, run, to_openai_schema). Callers that store
+    it alongside real Tools cast it (see cli register site).
+    """
 
     local_only = False
 
@@ -110,6 +117,22 @@ class RemoteMCPTool:
 
     def is_available(self) -> bool:
         return True
+
+    def to_openai_schema(self) -> dict[str, Any]:
+        """OpenAI-style function schema, same shape a built-in Tool produces.
+
+        A RemoteMCPTool is duck-typed as a Tool so the agents and registry can treat it
+        identically; this is the method the agent calls to hand the tool to the LLM, so it
+        has to exist here too, built from the remote tool's own input schema.
+        """
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": self.parameters_schema,
+            },
+        }
 
     async def _call_async(self, **kwargs: Any) -> str:
         params = self.server.to_server_params()

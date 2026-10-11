@@ -10,7 +10,7 @@ from hexswarm.llm.router import LLMRouter
 from hexswarm.memory.findings import FindingsStore
 from hexswarm.memory.knowledge import KnowledgeBase
 from hexswarm.observability import BudgetExceeded
-from hexswarm.safety.guard import ScopeGuard, ScopeViolation
+from hexswarm.safety.guard import ScopeGuard, ScopeViolation, ToolRiskLevel
 
 DEFAULT_PHASE_ORDER = ["recon", "scan", "exploit", "privesc"]
 
@@ -52,6 +52,7 @@ class Orchestrator:
         phase_order: list[str] | None = None,
         progress_callback: ProgressCallback | None = None,
         verify: bool = False,
+        confirm_from_risk: ToolRiskLevel | None = None,
     ) -> None:
         self.router = router
         self.scope_guard = scope_guard
@@ -65,6 +66,7 @@ class Orchestrator:
             human_in_the_loop=human_in_the_loop,
             confirm_fn=confirm_fn,
             models=models,
+            confirm_from_risk=confirm_from_risk,
         )
         if verify:
             self.agents["verify"] = build_verify_agent(router=router, model=(models or {}).get("verify"))

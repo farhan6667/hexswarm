@@ -308,10 +308,50 @@ def run(
         False, "--verify",
         help="Add a second-opinion verification pass that flags likely false positives before the report.",
     ),
+    mcp_config: Path = typer.Option(
+        None, "--mcp-config",
+        help="Optional YAML of external MCP servers whose tools join this engagement (scope-gated).",
+    ),
+    confirm_from: str = typer.Option(
+        None, "--confirm-from",
+        help="Threshold HITL: pause for confirmation at this risk tier and above "
+             "(read_only|active_recon|intrusive|exploit|post_exploit). Lower tiers run automatically.",
+    ),
 ) -> None:
     """Run the full recon -> scan -> exploit -> privesc -> report swarm against a target."""
     settings = load_settings()
     _apply_sandbox(settings)
+
+    confirm_from_risk = None
+    if confirm_from is not None:
+        try:
+            confirm_from_risk = ToolRiskLevel(confirm_from)
+        except ValueError:
+            console.print(
+                f"[red]Invalid --confirm-from '{confirm_from}'[/red] "
+                "(expected read_only, active_recon, intrusive, exploit, or post_exploit)."
+            )
+            raise typer.Exit(code=1)
+
+    if mcp_config is not None:
+        from typing import cast
+
+        from hexswarm.mcp.client import load_all_remote_tools
+        from hexswarm.tools.base import Tool, ToolRegistry
+
+        try:
+            remote_tools = load_all_remote_tools(mcp_config)
+        except FileNotFoundError as exc:
+            console.print(f"[red]MCP config error[/red]: {exc}")
+            raise typer.Exit(code=1)
+        for rt in remote_tools:
+            # RemoteMCPTool implements the Tool interface structurally (see its docstring)
+            # but isn't a subclass, so cast for the type checker.
+            ToolRegistry.register(cast(Tool, rt))
+        console.print(
+            f"[dim]Loaded {len(remote_tools)} tool(s) from external MCP server(s); "
+            "they go through the same scope guard as built-in tools.[/dim]"
+        )
 
     phase_order = None
     playbook_risk_cap = None
@@ -386,23 +426,40 @@ def run(
     console.print(f"[bold]HexSwarm[/bold] running engagement '[cyan]{guard.engagement_name}[/cyan]' "
                   f"against '[yellow]{target}[/yellow]'...\n")
 
-    with console.status("[bold cyan]Starting...[/bold cyan]", spinner="dots") as status:
-        def on_progress(event: str, phase: str) -> None:
-            if event == "start":
-                status.update(f"[bold cyan]{phase}[/bold cyan] agent is working...")
-            else:
-                console.print(f"  [green]done[/green]  {phase}")
+    def confirm_tool(tool_name: str, args: dict) -> bool:
+        return typer.confirm(f"  Run {tool_name} with {args}?")
 
+    def _run_engagement(progress):
         orchestrator = Orchestrator(
             router=router,
             scope_guard=guard,
             findings=findings,
             human_in_the_loop=settings.human_in_the_loop,
-            progress_callback=on_progress,
+            confirm_fn=confirm_tool if (confirm_from_risk or settings.human_in_the_loop) else None,
+            progress_callback=progress,
             phase_order=phase_order,
             verify=verify,
+            confirm_from_risk=confirm_from_risk,
         )
-        result = orchestrator.run(goal=goal, target=target)
+        return orchestrator.run(goal=goal, target=target)
+
+    if confirm_from_risk is not None or settings.human_in_the_loop:
+        # Threshold / full HITL needs a clean prompt, so skip the live spinner (it would
+        # fight the confirmation prompt for the same line); just print phase progress.
+        def on_progress(event: str, phase: str) -> None:
+            if event == "start":
+                console.print(f"[bold cyan]{phase}[/bold cyan] agent is working...")
+            else:
+                console.print(f"  [green]done[/green]  {phase}")
+        result = _run_engagement(on_progress)
+    else:
+        with console.status("[bold cyan]Starting...[/bold cyan]", spinner="dots") as status:
+            def on_progress(event: str, phase: str) -> None:
+                if event == "start":
+                    status.update(f"[bold cyan]{phase}[/bold cyan] agent is working...")
+                else:
+                    console.print(f"  [green]done[/green]  {phase}")
+            result = _run_engagement(on_progress)
 
     if "error" in result.phase_summaries:
         console.print(Panel(result.phase_summaries["error"], title="SCOPE ERROR", border_style="red"))
@@ -544,8 +601,8 @@ def mcp_server(
 @app.command()
 def bench(
     manifest: Path = typer.Option(
-        Path("examples/benchmarks/manifest.yaml"), "--manifest", "-m",
-        help="Path to a benchmark manifest.yaml.",
+        None, "--manifest", "-m",
+        help="Path to a benchmark manifest.yaml. Defaults to the one bundled with HexSwarm.",
     ),
     model: str = typer.Option(None, "--model", help="Override the primary LLM model string."),
     report_out: Path = typer.Option(
@@ -557,14 +614,14 @@ def bench(
     One honest, reproducible number per model/version instead of a vibe: anyone can clone
     the repo and run this same command against the same challenges.
     """
-    from hexswarm.bench import load_challenges, run_benchmark
+    from hexswarm.bench import DEFAULT_MANIFEST, load_challenges, run_benchmark
     from hexswarm.safety.guard import ToolRiskLevel
 
     settings = load_settings()
     _apply_sandbox(settings)
 
     try:
-        challenges = load_challenges(manifest)
+        challenges = load_challenges(manifest or DEFAULT_MANIFEST)
     except FileNotFoundError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1)

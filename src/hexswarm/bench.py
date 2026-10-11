@@ -21,6 +21,10 @@ from hexswarm.agents.base import Agent
 from hexswarm.memory.findings import FindingsStore
 from hexswarm.safety.guard import ScopeGuard
 
+# The benchmark set ships inside the package, so `hexswarm bench` works from a
+# plain `pip install hexswarm` (no repo clone needed), not just from a checkout.
+DEFAULT_MANIFEST = Path(__file__).parent / "data" / "benchmarks" / "manifest.yaml"
+
 
 @dataclass
 class BenchmarkChallenge:

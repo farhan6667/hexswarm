@@ -63,19 +63,35 @@ class Agent:
         knowledge_base: KnowledgeBase | None = None,
         human_in_the_loop: bool = False,
         confirm_fn: ConfirmFn | None = None,
+        confirm_from_risk: ToolRiskLevel | None = None,
     ) -> None:
         self.config = config
         self.router = router
         self.knowledge_base = knowledge_base or KnowledgeBase()
         self.human_in_the_loop = human_in_the_loop
         self.confirm_fn = confirm_fn
+        # Threshold HITL: when set, only tool calls at or above this risk tier need
+        # confirmation; lower tiers (recon, read-only) run automatically. This is more
+        # practical than all-or-nothing: let recon fly, pause before exploitation. When
+        # left None, behavior falls back to the human_in_the_loop boolean (confirm all,
+        # or nothing), so existing callers are unaffected.
+        self.confirm_from_risk = confirm_from_risk
         self._tools_by_name = {t.name: t for t in config.tools}
 
+    def _needs_confirmation(self, tool_name: str) -> bool:
+        if self.confirm_from_risk is not None:
+            tool = self._tools_by_name.get(tool_name)
+            if tool is None:
+                return True  # unknown tool: err on the side of asking
+            order = list(ToolRiskLevel)
+            return order.index(tool.risk_level) >= order.index(self.confirm_from_risk)
+        return self.human_in_the_loop
+
     def _confirm(self, tool_name: str, args: dict) -> bool:
-        if not self.human_in_the_loop:
+        if not self._needs_confirmation(tool_name):
             return True
         if self.confirm_fn is None:
-            # HITL requested but no confirm_fn wired up: fail safe, skip the call.
+            # Confirmation required but no confirm_fn wired up: fail safe, skip the call.
             return False
         return self.confirm_fn(tool_name, args)
 

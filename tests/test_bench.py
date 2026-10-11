@@ -3,7 +3,13 @@ from types import SimpleNamespace
 import pytest
 
 from hexswarm.agents.base import Agent, AgentConfig
-from hexswarm.bench import BenchmarkChallenge, BenchmarkReport, load_challenges, run_benchmark
+from hexswarm.bench import (
+    DEFAULT_MANIFEST,
+    BenchmarkChallenge,
+    BenchmarkReport,
+    load_challenges,
+    run_benchmark,
+)
 from hexswarm.llm.router import LLMRouter
 from hexswarm.safety.guard import ScopeGuard, ToolRiskLevel
 
@@ -18,7 +24,7 @@ def make_guard():
 
 
 def test_load_challenges_reads_the_real_manifest():
-    challenges = load_challenges("examples/benchmarks/manifest.yaml")
+    challenges = load_challenges(DEFAULT_MANIFEST)
     assert len(challenges) == 6
     ids = {c.id for c in challenges}
     assert "base64-simple" in ids

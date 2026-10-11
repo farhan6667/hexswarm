@@ -151,8 +151,20 @@ servers:
     risk_level: "exploit"
 ```
 
-HexSwarm doesn't know what an arbitrary external tool actually does, so you declare the risk tier (and, per tool, whether its target is even
-a network host) when you add the server, the same trust decision as adding any new tool.
+Then pull them into an engagement with `hexswarm run --mcp-config mcp_servers.yaml ...`. HexSwarm doesn't know what an arbitrary external tool
+actually does, so you declare the risk tier (and, per tool, whether its target is even a network host) when you add the server, the same trust
+decision as adding any new tool.
+
+### Pausing before the dangerous steps
+
+By default a run is autonomous once you approve the scope. For a tighter leash, `--confirm-from` makes it pause for your confirmation only at a
+given risk tier and above, while lower tiers keep running on their own:
+
+```bash
+hexswarm run --playbook full-engagement --target ... --scope ... --confirm-from exploit
+```
+
+That lets recon and scanning run unattended but stops to ask before anything in the exploit or post-exploit tiers fires.
 
 ### Sandboxing each tool call in its own container
 
@@ -173,9 +185,9 @@ toolchain installed: `hexswarm tools` reports every binary as actually present w
 hexswarm bench
 ```
 
-Runs the CTF agent against a small local CTF-style challenge set ([`examples/benchmarks/`](examples/benchmarks/)) and reports a pass count,
-in the spirit of Cybench/NYU-CTF Bench but tiny and fully offline: "solved 5/6" is a number anyone can reproduce by cloning the repo and
-running the same command against the same challenges, not a vibe.
+Runs the CTF agent against a small CTF-style challenge set bundled with the package ([`src/hexswarm/data/benchmarks/`](src/hexswarm/data/benchmarks/))
+and reports a pass count, in the spirit of Cybench/NYU-CTF Bench but tiny and fully offline: "solved 5/6" is a number anyone can reproduce by
+running the same command against the same challenges, not a vibe. It ships in the wheel, so it works from a plain `pip install` too.
 
 ### Capping spend and seeing where it went
 

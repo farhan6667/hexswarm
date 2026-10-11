@@ -19,8 +19,14 @@ All notable changes to HexSwarm are documented here. Format loosely follows
 - `Dockerfile.toolchain`: a Kali-based image with the real pentest toolchain installed, built
   and smoke-tested by a dedicated CI workflow that asserts a real `port_scan` against
   scanme.nmap.org comes back `simulated=False`. This is `HEXSWARM_SANDBOX_IMAGE`'s default.
-- `hexswarm bench`: runs the CTF agent against a small local CTF-style challenge set and
-  reports a pass count, in the spirit of Cybench/NYU-CTF Bench but tiny and fully offline.
+- `hexswarm bench`: runs the CTF agent against a small CTF-style challenge set bundled inside
+  the package (works from a plain `pip install`, not just a clone), reporting a pass count in
+  the spirit of Cybench/NYU-CTF Bench but tiny and fully offline.
+- Threshold human-in-the-loop (`run --confirm-from <tier>`): pause for confirmation only at a
+  given risk tier and above (e.g. let recon/scan run, confirm before exploit/privesc), instead
+  of the all-or-nothing HITL switch.
+- `run --mcp-config <file>`: pull tools from external MCP servers into an engagement, each one
+  scope-gated and risk-tiered like a built-in tool.
 - New `ai-security` tool category: `prompt_injection_probe` sends a battery of known
   injection/system-prompt-leak payloads to a target chat/LLM HTTP endpoint and flags
   responses matching compliance heuristics (triage, not a confirmed-vulnerability claim).

@@ -4,6 +4,22 @@ from hexswarm.mcp.client import McpServerConfig, RemoteMCPTool, load_mcp_server_
 from hexswarm.safety.guard import ScopeGuard, ScopeViolation, ToolRiskLevel
 
 
+def test_remote_tool_exposes_openai_schema_like_a_builtin():
+    # The agent/registry treat a RemoteMCPTool as a Tool, so it must expose the same
+    # to_openai_schema() the built-ins do, or building tool schemas for the LLM crashes.
+    server = McpServerConfig(name="svc", command="python")
+    tool = RemoteMCPTool(
+        server=server,
+        remote_name="demo_scan",
+        description="scan a thing",
+        input_schema={"type": "object", "properties": {"target": {"type": "string"}}, "required": ["target"]},
+    )
+    schema = tool.to_openai_schema()
+    assert schema["type"] == "function"
+    assert schema["function"]["name"] == "svc.demo_scan"
+    assert schema["function"]["parameters"]["required"] == ["target"]
+
+
 def test_requires_scope_check_for_default_applies_to_every_tool():
     server = McpServerConfig(name="svc", command="python", requires_scope_check=True)
     assert server.requires_scope_check_for("some_tool") is True

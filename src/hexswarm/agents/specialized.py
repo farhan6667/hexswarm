@@ -66,12 +66,16 @@ def build_phase_agents(
     human_in_the_loop: bool = False,
     confirm_fn: ConfirmFn | None = None,
     models: dict[str, str] | None = None,
+    confirm_from_risk: ToolRiskLevel | None = None,
 ) -> dict[str, Agent]:
     """Builds the five standard agents, wired to the live ToolRegistry.
 
     `models` lets you assign a cheaper/faster model to recon and a stronger
     model to exploit reasoning, e.g.:
         {"recon": "ollama/llama3.1", "exploit": "anthropic/claude-sonnet-5"}
+
+    `confirm_from_risk` enables threshold HITL: tool calls at or above that
+    tier pause for confirmation, lower tiers run automatically.
     """
     models = models or {}
     kb = knowledge_base or KnowledgeBase()
@@ -91,6 +95,7 @@ def build_phase_agents(
             knowledge_base=kb,
             human_in_the_loop=human_in_the_loop,
             confirm_fn=confirm_fn,
+            confirm_from_risk=confirm_from_risk,
         )
 
     return {

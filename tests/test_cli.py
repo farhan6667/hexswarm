@@ -191,13 +191,13 @@ def test_mcp_server_command_rejects_missing_scope(tmp_path):
 def test_bench_command_runs_end_to_end(tmp_path, monkeypatch):
     from types import SimpleNamespace
 
-    from hexswarm.bench import load_challenges
+    from hexswarm.bench import DEFAULT_MANIFEST, load_challenges
     from hexswarm.llm.router import LLMRouter
 
     # Script the fake model to answer each challenge, in manifest order, with that
     # challenge's own real flag, proving a genuinely correct model is scored 6/6.
 
-    challenges = load_challenges("examples/benchmarks/manifest.yaml")
+    challenges = load_challenges(DEFAULT_MANIFEST)
     flags_in_order = iter(c.flag for c in challenges)
 
     def fake_completion_fn_all_correct(**kwargs):
@@ -329,3 +329,59 @@ def test_lab_up_without_docker(monkeypatch):
     result = runner.invoke(app, ["lab", "up", "juice-shop"])
     assert result.exit_code == 1
     assert "Docker not found" in result.stdout
+
+
+def test_run_mcp_config_missing_file(tmp_path):
+    scope = tmp_path / "scope.yaml"
+    scope.write_text(
+        "engagement_name: demo\nallow:\n  - 'example.com'\nmax_risk_level: intrusive\n",
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app,
+        ["run", "--goal", "g", "--target", "example.com", "--scope", str(scope),
+         "--mcp-config", str(tmp_path / "nope.yaml")],
+    )
+    assert result.exit_code == 1
+    assert "MCP config error" in result.stdout
+
+
+def test_run_mcp_config_registers_remote_tools(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from hexswarm.llm.router import LLMRouter
+    from hexswarm.mcp.client import McpServerConfig, RemoteMCPTool
+    from hexswarm.tools.base import ToolRegistry
+
+    scope = tmp_path / "scope.yaml"
+    scope.write_text(
+        "engagement_name: demo\nallow:\n  - 'example.com'\nmax_risk_level: intrusive\n",
+        encoding="utf-8",
+    )
+    mcp_cfg = tmp_path / "mcp.yaml"
+    mcp_cfg.write_text("servers:\n  - name: svc\n    command: echo\n", encoding="utf-8")
+
+    fake_tool = RemoteMCPTool(
+        server=McpServerConfig(name="svc", command="echo", category="pentest"),
+        remote_name="demo_scan",
+        description="d",
+        input_schema={"type": "object", "properties": {"target": {"type": "string"}}},
+    )
+    monkeypatch.setattr("hexswarm.mcp.client.load_all_remote_tools", lambda p: [fake_tool])
+    monkeypatch.setattr(
+        LLMRouter, "_get_completion_fn",
+        lambda self: (lambda **k: SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="done", tool_calls=[]))])),
+    )
+
+    result = runner.invoke(
+        app,
+        ["run", "--goal", "g", "--target", "example.com", "--scope", str(scope),
+         "--mcp-config", str(mcp_cfg), "--yes"],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "Loaded 1 tool(s) from external MCP" in result.stdout
+    assert "svc.demo_scan" in ToolRegistry.all()
+    # cleanup global registry so the injected tool doesn't leak into other tests
+    ToolRegistry.all().pop("svc.demo_scan", None)
+    ToolRegistry._tools.pop("svc.demo_scan", None)
