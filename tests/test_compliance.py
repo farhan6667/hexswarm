@@ -37,6 +37,22 @@ def test_keyword_match_beats_tool_only_match():
     assert any("A.8.24" in c for c in mapped[0].iso27001)
 
 
+def test_exposed_network_service_does_not_fall_into_the_web_rule():
+    # A Redis-on-open-port finding is a network exposure, not a web-app flaw. The web rule
+    # must not carry a keyword broad enough ("exposed") to pull it in on a score tie.
+    s = store_with(
+        Finding(
+            phase="recon",
+            tool_name="port_scan",
+            target="10.0.0.5",
+            summary="Open port 6379 Redis exposed with no authentication",
+        )
+    )
+    mapped, _ = map_findings(s)
+    assert mapped[0].rule_id == "exposed-network-service"
+    assert any("A.8.21" in c for c in mapped[0].iso27001)
+
+
 def test_unmatched_finding_is_unmapped_not_compliant():
     s = store_with(Finding(phase="recon", tool_name="whois_lookup", target="x", summary="registrar info"))
     mapped, unmapped = map_findings(s)
