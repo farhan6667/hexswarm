@@ -1,3 +1,3 @@
 """HexSwarm: a swarm-of-agents framework for AI-driven offensive security research."""
 
-__version__ = "0.2.0"
+__version__ = "1.0.0"

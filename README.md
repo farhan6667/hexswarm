@@ -5,7 +5,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-3776ab.svg" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/models-OpenAI%20%7C%20Anthropic%20%7C%20Ollama%20%7C%20100%2B-5fd9a4.svg" alt="Any LiteLLM-supported model">
-  <img src="https://img.shields.io/badge/status-alpha-ff8a00.svg" alt="Status: alpha">
+  <img src="https://img.shields.io/badge/status-stable-brightgreen.svg" alt="Status: stable">
 </p>
 
 **HexSwarm is an open source Python framework for running AI agents against authorized penetration testing, bug bounty, and CTF targets.** Independent project by Syed Farhan Ahmed (SFA) at NexaForge. It wraps publicly available security tools (nmap, Nuclei, gobuster, sqlmap, Hydra, Metasploit, searchsploit, and others) via their own CLIs; it is not affiliated with, sponsored by, or endorsed by any of their maintainers or vendors.
@@ -29,7 +29,7 @@ high-level goal like "find a web server on this target and check for common vuln
 | **Exports** | Markdown report, SARIF (GitHub Security tab), and structured JSON |
 | **Onboards with** | `hexswarm init` (guided setup), `hexswarm doctor` (readiness check), playbooks, and bundled `lab` targets for safe end-to-end testing |
 | **Never fakes** | A missing tool binary runs in clearly labeled simulate mode instead of crashing or silently skipping |
-| **Status** | Alpha. 176 automated tests, ruff/mypy/bandit clean, independently audited; the bundled labs are the way to validate end to end against a real app |
+| **Status** | Stable (1.0). 188 automated tests, ruff/mypy/bandit clean; validated end to end in CI against a live OWASP Juice Shop lab |
 
 ## How it fits together
 

@@ -3,6 +3,29 @@
 All notable changes to HexSwarm are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.0.0] - 2026-10-11
+
+First stable release. The alpha label is dropped because the pipeline is now validated
+end to end in CI against a live, genuinely vulnerable application, not just in simulate
+mode and unit tests.
+
+### Added
+- Compliance mapping (`hexswarm compliance --findings <json> --framework iso27001|pci-dss|all`):
+  takes a run's findings and, for each one, points at the ISO 27001:2022 Annex A controls and
+  PCI DSS 4.0 requirements it relates to. It is advisory, not a verdict. A mapping means "this
+  finding touches that control", never "you pass" or "you fail", an unmapped finding is not
+  "compliant" (only unmatched), and every output carries that disclaimer. It maps technical
+  findings only; governance and policy controls a pentest never touches are out of scope by design.
+- A `lab-validation` CI workflow that spins up a disposable OWASP Juice Shop, runs the real web
+  toolchain (httpx, whatweb, nuclei, gobuster, sqlmap) against it through the real tool registry,
+  and maps the findings through the compliance layer. This is the end-to-end "validated against a
+  real target" gate. The tool-level run is deterministic and needs no API key; a full LLM-driven
+  run is an extra step that fires only when a model key is set as a repo secret.
+
+### Changed
+- Status moved from alpha to stable. Validation caught and fixed one real mapping misroute (a
+  network-exposure finding routing to the web rule on a keyword tie) before release.
+
 ## [0.2.0] - 2026-10-11
 
 ### Added
