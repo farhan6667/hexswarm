@@ -29,7 +29,7 @@ rules:
 
   - id: web-vulnerability
     match_tools: ["web_vuln_scan", "directory_brute", "web_crawl"]
-    match_keywords: ["xss", "cross-site", "csrf", "ssrf", "idor", "exposed", "misconfiguration", "directory listing", "backup file"]
+    match_keywords: ["xss", "cross-site", "csrf", "ssrf", "idor", "misconfiguration", "directory listing", "backup file"]
     iso27001: ["A.8.26 Application security requirements", "A.8.9 Configuration management"]
     pci_dss: ["6.2 Bespoke and custom software developed securely", "6.4.1 Public-facing web apps protected"]
     rationale: "Web-layer findings relate to application-security and configuration controls."
@@ -44,14 +44,14 @@ rules:
   - id: weak-transport-encryption
     match_tools: ["http_fingerprint", "web_vuln_scan", "port_scan"]
     match_keywords: ["tls 1.0", "tls 1.1", "sslv3", "ssl 3", "weak cipher", "self-signed", "expired certificate", "cleartext", "http only", "no encryption"]
-    iso27001: ["A.8.24 Use of cryptography", "A.8.20 Network security"]
+    iso27001: ["A.8.24 Use of cryptography", "A.8.20 Networks security"]
     pci_dss: ["4.2.1 Strong cryptography for transmission over open networks"]
     rationale: "Weak or absent transport encryption maps to cryptography and network-transmission controls."
 
   - id: exposed-network-service
     match_tools: ["port_scan", "fast_port_scan", "dns_enum", "dns_resolve", "http_probe"]
     match_keywords: ["open port", "exposed service", "unnecessary service", "telnet", "ftp open", "rdp open", "smb open", "database exposed", "redis", "mongodb", "elasticsearch"]
-    iso27001: ["A.8.20 Network security", "A.8.21 Security of network services", "A.8.9 Configuration management"]
+    iso27001: ["A.8.20 Networks security", "A.8.21 Security of network services", "A.8.9 Configuration management"]
     pci_dss: ["1.2 Network security controls configured", "2.2.5 Unnecessary services removed or secured"]
     rationale: "An exposed or unnecessary network service maps to network-security and secure-configuration controls."
 
