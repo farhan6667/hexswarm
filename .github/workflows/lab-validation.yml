@@ -24,6 +24,16 @@ on:
       - "ci/lab_validate.py"
       - "Dockerfile.toolchain"
       - ".github/workflows/lab-validation.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/hexswarm/compliance.py"
+      - "src/hexswarm/data/compliance/**"
+      - "src/hexswarm/labs.py"
+      - "examples/labs/**"
+      - "ci/lab_validate.py"
+      - "Dockerfile.toolchain"
+      - ".github/workflows/lab-validation.yml"
 
 permissions:
   contents: read
