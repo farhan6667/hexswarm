@@ -75,6 +75,27 @@ def test_orchestrator_fires_progress_callback_for_every_phase_and_report():
     ]
 
 
+def test_orchestrator_stops_cleanly_when_budget_exceeded():
+    from hexswarm.observability import Budget
+
+    def fn(**kwargs):
+        message = SimpleNamespace(content="ok", tool_calls=[])
+        usage = SimpleNamespace(prompt_tokens=10_000, completion_tokens=0)
+        return SimpleNamespace(choices=[SimpleNamespace(message=message)], usage=usage)
+
+    budget = Budget(max_tokens=1_000)
+    router = LLMRouter(primary_model="fake/model", completion_fn=fn, budget=budget)
+    orchestrator = Orchestrator(router=router, scope_guard=make_guard())
+
+    result = orchestrator.run(goal="assess", target="example.com")
+
+    assert result.budget_exceeded is True
+    # The first phase trips the budget; later phases must never run.
+    assert "recon" in result.phase_summaries
+    assert "scan" not in result.phase_summaries
+    assert "budget exceeded" in result.report_markdown.lower()
+
+
 def test_orchestrator_never_fires_progress_callback_on_scope_abort():
     def fn(**kwargs):
         return fake_response("should not run")

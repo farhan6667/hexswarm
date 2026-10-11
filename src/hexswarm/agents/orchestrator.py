@@ -9,6 +9,7 @@ from hexswarm.agents.specialized import build_phase_agents
 from hexswarm.llm.router import LLMRouter
 from hexswarm.memory.findings import FindingsStore
 from hexswarm.memory.knowledge import KnowledgeBase
+from hexswarm.observability import BudgetExceeded
 from hexswarm.safety.guard import ScopeGuard, ScopeViolation
 
 DEFAULT_PHASE_ORDER = ["recon", "scan", "exploit", "privesc"]
@@ -27,6 +28,7 @@ class EngagementResult:
     phase_summaries: dict[str, str] = field(default_factory=dict)
     report_markdown: str = ""
     findings: FindingsStore | None = None
+    budget_exceeded: bool = False
 
 
 class Orchestrator:
@@ -89,6 +91,17 @@ class Orchestrator:
                 summary = agent.run(goal=goal, target=target, guard=self.scope_guard, findings=self.findings)
             except ScopeViolation as exc:
                 summary = f"Phase halted by scope guard: {exc}"
+            except BudgetExceeded as exc:
+                # The engagement's cost/token ceiling was crossed mid-phase. Stop the
+                # whole pipeline cleanly: record what happened, still write a report over
+                # whatever was found before the ceiling, and don't start further phases.
+                result.phase_summaries[phase] = f"Phase stopped: {exc}"
+                self._notify("done", phase)
+                result.budget_exceeded = True
+                # The report agent shares this budget, so asking it to write a narrative
+                # would just re-trip the ceiling. Emit a plain findings-based report instead.
+                result.report_markdown = self._budget_stopped_report(target, exc)
+                return result
             result.phase_summaries[phase] = summary
             self._notify("done", phase)
 
@@ -100,3 +113,16 @@ class Orchestrator:
     def _generate_report(self, goal: str, target: str) -> str:
         report_agent = self.agents["report"]
         return report_agent.run(goal=goal, target=target, guard=self.scope_guard, findings=self.findings)
+
+    def _budget_stopped_report(self, target: str, exc: Exception) -> str:
+        """A plain, LLM-free report written when the budget stopped the run mid-engagement."""
+        lines = [
+            f"# Engagement stopped: budget exceeded ({target})",
+            "",
+            f"The run was halted because: {exc}",
+            "",
+            "Findings collected before the stop:",
+            "",
+            self.findings.summary_text(),
+        ]
+        return "\n".join(lines) + "\n"

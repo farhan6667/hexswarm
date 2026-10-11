@@ -19,6 +19,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from hexswarm.observability import BudgetExceeded
+
 
 @dataclass
 class LLMMessage:
@@ -65,12 +67,20 @@ class LLMRouter:
         completion_fn: Callable[..., Any] | None = None,
         temperature: float = 0.2,
         max_retries: int = 2,
+        telemetry: Any = None,
+        budget: Any = None,
+        phase: str = "",
     ) -> None:
         self.primary_model = primary_model
         self.fallback_models = fallback_models or []
         self.temperature = temperature
         self.max_retries = max_retries
         self._completion_fn = completion_fn
+        # Optional cost/observability hooks. Both default to None, in which case
+        # the router behaves exactly as before: no tracking, no budget ceiling.
+        self.telemetry = telemetry
+        self.budget = budget
+        self.phase = phase
 
     def _get_completion_fn(self) -> Callable[..., Any]:
         if self._completion_fn is not None:
@@ -115,13 +125,42 @@ class LLMRouter:
                         kwargs["tool_choice"] = "auto"
 
                     raw = completion_fn(**kwargs)
-                    return self._parse_response(raw, candidate)
+                    response = self._parse_response(raw, candidate)
+                    self._record_cost(raw, candidate)
+                    return response
+                except BudgetExceeded:
+                    # A budget ceiling is a hard stop for the whole engagement, not a
+                    # provider failure to retry or fall back from. Propagate it immediately.
+                    raise
                 except Exception as exc:  # noqa: BLE001 - provider errors vary widely
                     last_error = exc
                     continue
         raise RuntimeError(
             f"All model candidates failed: {candidates}. Last error: {last_error}"
         ) from last_error
+
+    def _record_cost(self, raw: Any, model_used: str) -> None:
+        """Records token/cost usage and enforces the budget ceiling, if either is configured.
+
+        Runs after a successful completion. If the budget is now exceeded this raises
+        BudgetExceeded, which the caller treats as an engagement-ending condition.
+        """
+        if self.telemetry is None and self.budget is None:
+            return
+        from hexswarm.observability import estimate_cost
+
+        prompt_tokens, completion_tokens, cost_usd = estimate_cost(raw)
+        if self.telemetry is not None:
+            self.telemetry.record_llm_call(
+                model=model_used,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                cost_usd=cost_usd,
+                phase=self.phase,
+            )
+        if self.budget is not None:
+            self.budget.add(cost_usd, prompt_tokens + completion_tokens)
+            self.budget.check()
 
     @staticmethod
     def _parse_response(raw: Any, model_used: str) -> LLMResponse:

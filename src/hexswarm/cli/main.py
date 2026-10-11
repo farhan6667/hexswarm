@@ -270,6 +270,18 @@ def run(
         False, "--yes", "-y",
         help="Skip the pre-run authorization confirmation prompt (for CI/scripted use).",
     ),
+    max_cost: float = typer.Option(
+        None, "--max-cost", help="Abort the engagement if LLM spend exceeds this many USD."
+    ),
+    max_tokens: int = typer.Option(
+        None, "--max-tokens", help="Abort the engagement if total tokens exceed this count."
+    ),
+    trace_out: Path = typer.Option(
+        None, "--trace-out", help="Optional JSONL path for the per-call cost/tool trace."
+    ),
+    sarif_out: Path = typer.Option(
+        None, "--sarif-out", help="Optional SARIF path (for GitHub code scanning) of the findings."
+    ),
 ) -> None:
     """Run the full recon -> scan -> exploit -> privesc -> report swarm against a target."""
     settings = load_settings()
@@ -300,10 +312,17 @@ def run(
             console.print("Aborted. Nothing was run.")
             raise typer.Exit(code=1)
 
+    from hexswarm.observability import Budget, Telemetry
+
+    telemetry = Telemetry(engagement_name=guard.engagement_name, trace_path=trace_out)
+    budget = Budget(max_cost_usd=max_cost, max_tokens=max_tokens)
+
     router = LLMRouter(
         primary_model=model or settings.primary_model,
         fallback_models=settings.fallback_models,
         temperature=settings.temperature,
+        telemetry=telemetry,
+        budget=budget,
     )
 
     from hexswarm.memory.findings import FindingsStore
@@ -338,8 +357,18 @@ def run(
 
     console.print(Panel(Markdown(result.report_markdown), title="FINAL REPORT", border_style="green"))
 
+    if result.budget_exceeded:
+        console.print("[yellow]Note: the engagement stopped early because a budget ceiling was reached.[/yellow]")
+
     report_out.write_text(result.report_markdown, encoding="utf-8")
     console.print(f"\n[green]Report written to {report_out}[/green]")
+    console.print(f"[dim]Cost/usage: {telemetry.summary()}[/dim]")
+
+    if sarif_out is not None:
+        from hexswarm.reporting import findings_to_sarif
+
+        sarif_out.write_text(findings_to_sarif(findings, target), encoding="utf-8")
+        console.print(f"[green]SARIF written to {sarif_out}[/green]")
 
 
 @app.command()
