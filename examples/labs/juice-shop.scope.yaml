@@ -1,0 +1,16 @@
+# Scope file matching the juice-shop lab. Use it with:
+#   hexswarm lab up juice-shop
+#   hexswarm run --playbook web-assessment --target http://localhost:3000 \
+#       --scope examples/labs/juice-shop.scope.yaml --yes
+#
+# localhost only: this lab runs on your own machine, so this is a target you
+# are unambiguously authorized to test.
+
+engagement_name: "juice-shop-lab"
+allow:
+  - "localhost"
+  - "127.0.0.1"
+deny: []
+max_risk_level: "intrusive"
+authorized_by: "Local lab (own machine)"
+notes: "OWASP Juice Shop running locally via `hexswarm lab up juice-shop`. Disposable test target."

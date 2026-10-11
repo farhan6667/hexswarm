@@ -1,0 +1,19 @@
+# OWASP Juice Shop, an intentionally vulnerable web app, for safely exercising
+# HexSwarm end to end against a REAL application (not simulate mode, not a CTF
+# decoder). `hexswarm lab up juice-shop` starts it, then point a run at
+# http://localhost:3000 with the matching scope file below.
+#
+# This is the gap this release closes: most of HexSwarm was built and tested in
+# simulate mode, and a bundled, disposable, locally-hosted vulnerable target is
+# the honest way to validate the real pipeline without touching anyone else's
+# systems.
+#
+# Everything binds to localhost only. Tear down with `hexswarm lab down juice-shop`.
+
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    container_name: hexswarm-lab-juice-shop
+    ports:
+      - "127.0.0.1:3000:3000"
+    restart: "no"

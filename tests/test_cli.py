@@ -304,3 +304,28 @@ def test_run_playbook_unknown_name(tmp_path):
     )
     assert result.exit_code == 1
     assert "Playbook error" in result.stdout
+
+
+def test_lab_list_command():
+    result = runner.invoke(app, ["lab", "list"])
+    assert result.exit_code == 0
+    assert "juice-shop" in result.stdout
+
+
+def test_lab_up_requires_name():
+    result = runner.invoke(app, ["lab", "up"])
+    assert result.exit_code == 1
+    assert "lab name is required" in result.stdout.lower()
+
+
+def test_lab_unknown_action():
+    result = runner.invoke(app, ["lab", "sideways"])
+    assert result.exit_code == 1
+    assert "Unknown action" in result.stdout
+
+
+def test_lab_up_without_docker(monkeypatch):
+    monkeypatch.setattr("hexswarm.labs.docker_available", lambda: False)
+    result = runner.invoke(app, ["lab", "up", "juice-shop"])
+    assert result.exit_code == 1
+    assert "Docker not found" in result.stdout

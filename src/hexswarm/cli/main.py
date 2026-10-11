@@ -597,5 +597,63 @@ def bench(
     console.print(f"[green]Report written to {report_out}[/green]")
 
 
+@app.command()
+def lab(
+    action: str = typer.Argument(..., help="One of: list, up, down."),
+    name: str = typer.Argument(None, help="Lab name (required for up/down), e.g. juice-shop."),
+) -> None:
+    """Manage bundled vulnerable labs: disposable localhost targets for real end-to-end testing.
+
+    `hexswarm lab list` shows what's available; `hexswarm lab up juice-shop` starts one, and
+    `hexswarm lab down juice-shop` tears it down. Each lab ships with a matching scope file
+    (examples/labs/<name>.scope.yaml) so you can point a run at it immediately.
+    """
+    from hexswarm.labs import available_labs, docker_available, run_lab_action, scope_file_for
+
+    labs = available_labs()
+
+    if action == "list":
+        table = Table(title="HexSwarm bundled labs")
+        table.add_column("Name")
+        table.add_column("Scope file")
+        for lab_name in labs:
+            scope = scope_file_for(lab_name)
+            table.add_row(lab_name, str(scope) if scope else "(none)")
+        console.print(table)
+        return
+
+    if action not in ("up", "down"):
+        console.print(f"[red]Unknown action '{action}'[/red] (expected list, up, or down).")
+        raise typer.Exit(code=1)
+
+    if name is None:
+        console.print(f"[red]A lab name is required for '{action}'[/red] (see `hexswarm lab list`).")
+        raise typer.Exit(code=1)
+
+    if not docker_available():
+        console.print("[red]Docker not found[/red]. Labs need Docker + the compose plugin installed.")
+        raise typer.Exit(code=1)
+
+    try:
+        console.print(f"[bold]Lab {action}[/bold]: {name}...")
+        result = run_lab_action(name, action)
+    except KeyError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1)
+
+    if result.returncode != 0:
+        console.print(f"[red]docker compose {action} failed:[/red]\n{result.stderr}")
+        raise typer.Exit(code=1)
+
+    console.print(f"[green]Lab '{name}' {action} complete.[/green]")
+    if action == "up":
+        scope = scope_file_for(name)
+        if scope:
+            console.print(
+                f"[dim]Try: hexswarm run --playbook web-assessment --target http://localhost:3000 "
+                f"--scope {scope} --yes[/dim]"
+            )
+
+
 if __name__ == "__main__":
     app()
