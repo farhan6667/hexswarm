@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/farhan6667/hexswarm/actions/workflows/ci.yml"><img src="https://github.com/farhan6667/hexswarm/actions/workflows/ci.yml/badge.svg" alt="tests"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache-2.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-3776ab.svg" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/models-OpenAI%20%7C%20Anthropic%20%7C%20Ollama%20%7C%20100%2B-5fd9a4.svg" alt="Any LiteLLM-supported model">
   <img src="https://img.shields.io/badge/status-alpha-ff8a00.svg" alt="Status: alpha">
@@ -29,7 +29,7 @@ high-level goal like "find a web server on this target and check for common vuln
 | **Exports** | Markdown report, SARIF (GitHub Security tab), and structured JSON |
 | **Onboards with** | `hexswarm init` (guided setup), `hexswarm doctor` (readiness check), playbooks, and bundled `lab` targets for safe end-to-end testing |
 | **Never fakes** | A missing tool binary runs in clearly labeled simulate mode instead of crashing or silently skipping |
-| **Status** | Alpha. 170 automated tests, ruff/mypy/bandit clean, independently audited; the bundled labs are the way to validate end to end against a real app |
+| **Status** | Alpha. 176 automated tests, ruff/mypy/bandit clean, independently audited; the bundled labs are the way to validate end to end against a real app |
 
 ## How it fits together
 
@@ -377,7 +377,7 @@ If your company can help with test infrastructure, hosting, tools, or funding, t
 
 ## License
 
-[Apache-2.0](LICENSE). See [NOTICE](NOTICE) for the attribution and trademark note.
+MIT, see [LICENSE](LICENSE).
 
 ---
 

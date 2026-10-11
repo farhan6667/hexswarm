@@ -16,7 +16,7 @@ FROM kalilinux/kali-rolling
 
 LABEL org.opencontainers.image.source="https://github.com/farhan6667/hexswarm" \
       org.opencontainers.image.description="HexSwarm with the real offensive-security toolchain installed (nmap, nuclei, gobuster, sqlmap, hydra, metasploit, searchsploit, whois, subfinder, whatweb, file, binutils, hashid)." \
-      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.authors="Syed Farhan Ahmed (SFA), NexaForge"
 
 ENV DEBIAN_FRONTEND=noninteractive
