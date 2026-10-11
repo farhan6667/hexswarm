@@ -18,13 +18,18 @@ high-level goal like "find a web server on this target and check for common vuln
 
 | | |
 |---|---|
-| **Runs** | `recon -> scan -> exploit -> privesc -> report`, a five-agent pipeline against one authorized target per engagement |
+| **Runs** | `recon -> scan -> exploit -> privesc -> report`, a multi-agent pipeline against one authorized target per engagement |
 | **Gates** | Every tool call against an explicit `scope.yaml` allow/deny list and a max risk tier, enforced in code beneath the LLM, not in its prompt |
 | **Connects to** | OpenAI, Anthropic, local Ollama, or 100+ other providers through [LiteLLM](https://github.com/BerriAI/litellm), one config line to switch |
-| **Also solves** | CTF challenges: file ID, string extraction, embedded-data scanning, hash ID, and multi-codec decoding, no scope file needed |
-| **Onboards with** | `hexswarm init` (guided setup wizard) and `hexswarm doctor` (checks your model and tools are actually ready) |
+| **Caps spend** | A hard cost/token budget that aborts the run the moment it's crossed, plus a JSONL trace of every call's cost, so an autonomous run can't quietly run up a bill |
+| **Proves findings** | Every finding carries the exact command, a real-vs-simulated flag, and a hash of its output; an optional `--verify` pass flags likely false positives |
+| **Speaks MCP** | Exposes its tools to any MCP client (Claude Desktop, Kali's native workflow) and can pull in tools from other MCP servers, all still scope-gated |
+| **Sandboxes** | Optional per-tool Docker isolation; a Kali-based toolchain image for real execution |
+| **Also solves** | CTF challenges (file ID, decoding, steg) and AI-app testing (`ai-audit` for prompt injection), no network scope needed for CTF |
+| **Exports** | Markdown report, SARIF (GitHub Security tab), and structured JSON |
+| **Onboards with** | `hexswarm init` (guided setup), `hexswarm doctor` (readiness check), playbooks, and bundled `lab` targets for safe end-to-end testing |
 | **Never fakes** | A missing tool binary runs in clearly labeled simulate mode instead of crashing or silently skipping |
-| **Status** | Alpha. 76 automated tests, ruff/mypy/bandit clean, independently audited; not yet battle-tested against a live engagement |
+| **Status** | Alpha. 170 automated tests, ruff/mypy/bandit clean, independently audited; the bundled labs are the way to validate end to end against a real app |
 
 ## Screenshots
 
@@ -173,6 +178,56 @@ hexswarm bench
 Runs the CTF agent against a small local CTF-style challenge set ([`examples/benchmarks/`](examples/benchmarks/)) and reports a pass count,
 in the spirit of Cybench/NYU-CTF Bench but tiny and fully offline: "solved 5/6" is a number anyone can reproduce by cloning the repo and
 running the same command against the same challenges, not a vibe.
+
+### Capping spend and seeing where it went
+
+Agents burn far more tokens than a chatbot, and an unsupervised autonomous run can quietly cost real money. Put a hard ceiling on it:
+
+```bash
+hexswarm run --playbook web-assessment --target ... --scope ... \
+  --max-cost 2.00 --max-tokens 500000 --trace-out run.jsonl
+```
+
+The run aborts the moment either ceiling is crossed (and still writes a report over whatever was found first). `--trace-out` records one
+JSON line per LLM call and tool call, with tokens, cost, phase, timing, and whether the tool was simulated, so a run is fully auditable after
+the fact. Both are opt-in; without them nothing is tracked.
+
+### Evidence, verification, and CI-ready output
+
+Every finding carries the exact command that produced it, a real-vs-simulated flag, and a sha256 of its full output, so it traces back to a
+reproducible command and can't be passed off as real when it was a dry run. Add `--verify` for a second-opinion pass that reviews each
+medium-or-higher finding against its evidence and flags likely false positives before the report. Export for the rest of your toolchain:
+
+```bash
+hexswarm run ... --verify --sarif-out findings.sarif
+```
+
+SARIF drops straight into GitHub's code-scanning / Security tab; a plain JSON export is also available.
+
+### Playbooks
+
+Named presets that bundle the goal, phase order, and a risk cap so you don't retype them. A playbook can only *narrow* the scope file's risk
+cap, never widen it, and never carries a scope or target of its own:
+
+```bash
+hexswarm playbooks                      # list built-ins
+hexswarm run --playbook recon-only --target ... --scope ...
+```
+
+Built-ins: `recon-only`, `web-assessment`, `full-engagement`. Point `--playbook` at a YAML path for your own.
+
+### Bundled vulnerable labs
+
+Validate the real pipeline against a genuinely vulnerable app, safely, on your own machine:
+
+```bash
+hexswarm lab up juice-shop
+hexswarm run --playbook web-assessment --target http://localhost:3000 \
+  --scope examples/labs/juice-shop.scope.yaml --yes
+hexswarm lab down juice-shop
+```
+
+The lab is localhost-bound and disposable, and ships with a matching scope file. Needs Docker + the compose plugin.
 
 ## Install
 

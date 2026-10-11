@@ -29,6 +29,27 @@ All notable changes to HexSwarm are documented here. Format loosely follows
   the literal word) and alias-match-count ranking instead of unordered substring containment,
   plus ten new services (postgresql, redis, mongodb, elasticsearch, jenkins, docker/kubernetes
   APIs, telnet, vnc, snmp, wordpress).
+- Cost/token budget governance and an engagement trace: `run --max-cost`/`--max-tokens` put a
+  hard ceiling on an autonomous run and abort it the moment it's crossed; `--trace-out` writes
+  an append-only JSONL of every LLM call and tool call with tokens, cost, phase, timing, and
+  whether a tool was simulated. Both opt-in. This is the spend-control/observability gap the
+  2026 agentic-pentest field mostly leaves open.
+- Evidence trail on every finding: the exact command that produced it, whether it was a real
+  run or simulate mode, and a sha256 of the full output, so a finding can be traced to a
+  reproducible command and confirmed not to be a dry run before it's cited.
+- SARIF 2.1.0 and structured-JSON export (`run --sarif-out`), so findings drop straight into
+  GitHub's code-scanning / Security tab or a CI gate.
+- Verification pass (`run --verify`): an optional second-opinion agent that reviews each
+  medium+ finding against its evidence and flags likely false positives (and never lets a
+  simulated result read as confirmed) before the report.
+- Engagement playbooks: `run --playbook recon-only|web-assessment|full-engagement` (or a path)
+  bundle goal + phase order + a risk cap. A playbook can only narrow the scope file's risk cap,
+  never widen it, and carries no scope or target of its own. `hexswarm playbooks` lists them.
+- ProjectDiscovery recon tools: http_probe (httpx), fast_port_scan (naabu), web_crawl (katana),
+  dns_resolve (dnsx), wired as scope-gated adapters like the rest.
+- Bundled vulnerable labs: `hexswarm lab list|up|down` spins up a disposable, localhost-only
+  OWASP Juice Shop (with a ready-made scope file) so the real pipeline can be validated against
+  a genuinely vulnerable app without touching anyone else's systems.
 
 ## [0.1.0] - 2026-10-10
 
