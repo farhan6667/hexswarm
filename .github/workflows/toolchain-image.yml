@@ -46,7 +46,9 @@ jobs:
           # ToolRegistry inside the real toolchain image, not a unit test with the
           # subprocess mocked out, and asserts the result was NOT simulated: nmap is
           # genuinely installed and genuinely ran.
-          docker run --rm hexswarm-toolchain:ci python3 -c "
+          # The image's entrypoint is `hexswarm`, so python3 has to be set as the
+          # entrypoint explicitly or the interpreter call is parsed as a hexswarm subcommand.
+          docker run --rm --entrypoint python3 hexswarm-toolchain:ci -c "
           from hexswarm.tools.base import ToolRegistry
           from hexswarm.safety.guard import ScopeGuard, ToolRiskLevel
 
