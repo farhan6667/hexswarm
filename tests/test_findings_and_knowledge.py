@@ -29,6 +29,42 @@ def test_findings_store_empty_summary():
     assert "No findings" in store.summary_text()
 
 
+def test_finding_auto_hashes_raw_output():
+    import hashlib
+
+    f = Finding(phase="recon", tool_name="port_scan", target="1.2.3.4", summary="s", raw_output="22/tcp open")
+    expected = hashlib.sha256(b"22/tcp open").hexdigest()
+    assert f.evidence_sha256 == expected
+
+
+def test_finding_no_hash_when_no_output():
+    f = Finding(phase="recon", tool_name="whois_lookup", target="x", summary="s")
+    assert f.evidence_sha256 == ""
+
+
+def test_finding_carries_command_and_simulated_flag():
+    f = Finding(
+        phase="recon", tool_name="port_scan", target="1.2.3.4", summary="s",
+        raw_output="out", command="nmap -sV 1.2.3.4", simulated=True,
+    )
+    assert f.command == "nmap -sV 1.2.3.4"
+    assert f.simulated is True
+
+
+def test_evidence_survives_persistence_roundtrip(tmp_path):
+    path = tmp_path / "findings.json"
+    store = FindingsStore(engagement_name="t", persist_path=path)
+    store.add(Finding(
+        phase="recon", tool_name="port_scan", target="1.2.3.4", summary="s",
+        raw_output="22/tcp open", command="nmap 1.2.3.4", simulated=False,
+    ))
+    reloaded = FindingsStore(engagement_name="t", persist_path=path)
+    f = reloaded.all()[0]
+    assert f.command == "nmap 1.2.3.4"
+    assert f.evidence_sha256 != ""
+    assert f.simulated is False
+
+
 def test_knowledge_base_lookup_matches_service():
     kb = KnowledgeBase()
     hints = kb.lookup("220 vsFTPd 2.3.4 service ready")

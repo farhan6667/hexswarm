@@ -1,0 +1,7 @@
+name: web-assessment
+description: "Recon plus vulnerability scanning of web services, no exploitation. A safe first pass on a web app."
+goal: "Find the web services on this target, fingerprint their stack, and check them for common web vulnerabilities and misconfigurations. Do not attempt exploitation; report what's worth a closer look."
+phases:
+  - recon
+  - scan
+max_risk_level: intrusive

@@ -7,6 +7,7 @@ to the Report agent, which just reads everything back out at the end.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -25,6 +26,19 @@ class Finding:
     timestamp: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
+    # Evidence trail: what exact command produced this, whether it was a real run
+    # or simulate mode, and a hash of the full output. A finding you can't trace
+    # back to a reproducible command isn't worth much in a report, and "was this
+    # real or simulated?" is the question that decides whether a finding can even
+    # be cited. The hash lets a reviewer confirm the stored raw_output wasn't
+    # altered after the fact.
+    command: str = ""
+    simulated: bool = False
+    evidence_sha256: str = ""
+
+    def __post_init__(self) -> None:
+        if self.raw_output and not self.evidence_sha256:
+            self.evidence_sha256 = hashlib.sha256(self.raw_output.encode("utf-8")).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

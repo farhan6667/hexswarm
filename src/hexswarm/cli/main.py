@@ -239,6 +239,21 @@ def list_tools() -> None:
     console.print(table)
 
 
+@app.command(name="playbooks")
+def list_playbooks() -> None:
+    """List the built-in engagement playbooks you can pass to `run --playbook`."""
+    from hexswarm.playbooks import builtin_playbooks
+
+    table = Table(title="HexSwarm built-in playbooks")
+    table.add_column("Name")
+    table.add_column("Phases")
+    table.add_column("Max risk")
+    table.add_column("Description")
+    for pb in builtin_playbooks().values():
+        table.add_row(pb.name, " -> ".join(pb.phases), pb.max_risk_level or "(scope default)", pb.description)
+    console.print(table)
+
+
 @app.command(name="scope-check")
 def scope_check(
     scope_file: Path = typer.Argument(..., help="Path to a scope YAML file."),
@@ -256,9 +271,16 @@ def scope_check(
 
 @app.command()
 def run(
-    goal: str = typer.Option(..., "--goal", "-g", help="High-level natural-language objective."),
     target: str = typer.Option(..., "--target", "-t", help="Target host, IP, CIDR, or URL."),
     scope_file: Path = typer.Option(..., "--scope", "-s", help="Path to a scope YAML file."),
+    goal: str = typer.Option(
+        None, "--goal", "-g",
+        help="High-level objective. Optional if --playbook is given (the playbook supplies one).",
+    ),
+    playbook: str = typer.Option(
+        None, "--playbook", "-p",
+        help="A built-in playbook name (recon-only, web-assessment, full-engagement) or a path to one.",
+    ),
     model: str = typer.Option(None, "--model", help="Override the primary LLM model string."),
     report_out: Path = typer.Option(
         Path("hexswarm_report.md"), "--report-out", help="Where to write the final Markdown report."
@@ -286,11 +308,39 @@ def run(
     """Run the full recon -> scan -> exploit -> privesc -> report swarm against a target."""
     settings = load_settings()
     _apply_sandbox(settings)
+
+    phase_order = None
+    playbook_risk_cap = None
+    if playbook is not None:
+        from hexswarm.playbooks import resolve_playbook
+
+        try:
+            pb = resolve_playbook(playbook)
+        except FileNotFoundError as exc:
+            console.print(f"[red]Playbook error[/red]: {exc}")
+            raise typer.Exit(code=1)
+        goal = goal or pb.goal
+        phase_order = pb.phases
+        playbook_risk_cap = pb.max_risk_level
+        console.print(f"[dim]Using playbook '{pb.name}': {pb.description}[/dim]")
+
+    if not goal:
+        console.print("[red]Error[/red]: provide --goal, or --playbook (which supplies one).")
+        raise typer.Exit(code=1)
+
     try:
         guard = ScopeGuard.from_file(scope_file)
     except (FileNotFoundError, ValueError) as exc:
         console.print(f"[red]Scope error[/red]: {exc}")
         raise typer.Exit(code=1)
+
+    # A playbook may only narrow the engagement's risk cap, never widen it: take the
+    # lower of the scope file's cap and the playbook's.
+    if playbook_risk_cap is not None:
+        order = list(ToolRiskLevel)
+        pb_level = ToolRiskLevel(playbook_risk_cap)
+        if order.index(pb_level) < order.index(guard.max_risk_level):
+            guard.max_risk_level = pb_level
 
     try:
         guard.check_target(target)
@@ -345,6 +395,7 @@ def run(
             findings=findings,
             human_in_the_loop=settings.human_in_the_loop,
             progress_callback=on_progress,
+            phase_order=phase_order,
         )
         result = orchestrator.run(goal=goal, target=target)
 

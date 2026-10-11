@@ -167,6 +167,8 @@ class Agent:
                 summary=result.output[:500],
                 severity=_infer_severity(tool, result.success, result.simulated),
                 raw_output=result.output,
+                command=result.command,
+                simulated=result.simulated,
             )
         )
         prefix = "[SIMULATED] " if result.simulated else ""

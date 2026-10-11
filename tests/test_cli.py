@@ -272,3 +272,35 @@ def test_ai_audit_runs_end_to_end(tmp_path, monkeypatch):
     )
     assert result.exit_code == 0, result.stdout
     assert "No probes were flagged" in result.stdout
+
+
+def test_playbooks_command_lists_builtins():
+    result = runner.invoke(app, ["playbooks"])
+    assert result.exit_code == 0
+    assert "recon-only" in result.stdout
+    assert "web-assessment" in result.stdout
+    assert "full-engagement" in result.stdout
+
+
+def test_run_rejects_missing_goal_and_playbook(tmp_path):
+    scope = tmp_path / "scope.yaml"
+    scope.write_text(
+        "engagement_name: demo\nallow:\n  - 'example.com'\nmax_risk_level: intrusive\n",
+        encoding="utf-8",
+    )
+    result = runner.invoke(app, ["run", "--target", "example.com", "--scope", str(scope)])
+    assert result.exit_code == 1
+    assert "provide --goal" in result.stdout
+
+
+def test_run_playbook_unknown_name(tmp_path):
+    scope = tmp_path / "scope.yaml"
+    scope.write_text(
+        "engagement_name: demo\nallow:\n  - 'example.com'\nmax_risk_level: intrusive\n",
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app, ["run", "--target", "example.com", "--scope", str(scope), "--playbook", "does-not-exist"]
+    )
+    assert result.exit_code == 1
+    assert "Playbook error" in result.stdout

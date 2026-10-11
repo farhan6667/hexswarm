@@ -1,0 +1,9 @@
+name: full-engagement
+description: "The complete recon -> scan -> exploit -> privesc pipeline. Only for a target you're fully authorized to exploit."
+goal: "Assess this target end to end: map the attack surface, identify vulnerabilities, attempt scope-authorized proof-of-concept exploitation of credible findings, and enumerate privilege escalation if a foothold is established."
+phases:
+  - recon
+  - scan
+  - exploit
+  - privesc
+max_risk_level: post_exploit

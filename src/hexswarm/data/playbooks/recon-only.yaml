@@ -1,0 +1,6 @@
+name: recon-only
+description: "Map the attack surface and stop. No scanning, exploitation, or post-exploitation."
+goal: "Map this target's attack surface: hosts, open ports, running services, and web technologies. Do not scan for vulnerabilities or attempt any exploitation."
+phases:
+  - recon
+max_risk_level: active_recon
