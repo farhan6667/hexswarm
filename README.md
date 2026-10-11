@@ -31,34 +31,32 @@ high-level goal like "find a web server on this target and check for common vuln
 | **Never fakes** | A missing tool binary runs in clearly labeled simulate mode instead of crashing or silently skipping |
 | **Status** | Alpha. 170 automated tests, ruff/mypy/bandit clean, independently audited; the bundled labs are the way to validate end to end against a real app |
 
+## How it fits together
+
+<p align="center"><img src="docs/img/architecture.svg" alt="HexSwarm architecture: a goal and a scope file flow into a swarm of phase agents (recon, scan, exploit, privesc, verify, report) sharing a findings store; every tool call is checked by the scope guard and metered by the budget/trace layer; tools run on the host or in a Docker sandbox; output is a Markdown report, SARIF, and JSON; the same tools are also exposed as an MCP server" width="100%"></p>
+
 ## Screenshots
 
-**`hexswarm init`**, the guided setup wizard:
+**`hexswarm run --verify --sarif-out`**, a real recon pass against scanme.nmap.org through the full pipeline, with the verification pass, the final Markdown report, a cost/usage line, and SARIF export:
 
-<p align="center"><img src="docs/screenshots/hexswarm_init.png" alt="hexswarm init interactive wizard choosing a model, naming the engagement, adding scanme.nmap.org to scope, and picking a risk level" width="700"></p>
+<p align="center"><img src="docs/screenshots/hexswarm_run_verify.png" alt="hexswarm run showing recon, scan, exploit, privesc and verify phase panels, a final Markdown assessment report, a cost/usage summary line, and SARIF written to disk" width="720"></p>
 
-**`hexswarm doctor`**, checking the configured model and tool availability:
+**`hexswarm tools`**, the full registry with categories and risk tiers color-coded:
 
-<p align="center"><img src="docs/screenshots/hexswarm_doctor.png" alt="hexswarm doctor reporting the Anthropic API key is set, 7 of 17 tools installed, and the engagement is ready to run" width="700"></p>
+<p align="center"><img src="docs/screenshots/hexswarm_tools.png" alt="hexswarm tools output listing all registered tools across pentest, ctf, and ai-security categories with risk level, binary, and install status, color-coded by risk" width="720"></p>
 
-**`hexswarm tools`**, the full registry with risk tiers color-coded:
+**`hexswarm playbooks`**, the built-in engagement presets:
 
-<p align="center"><img src="docs/screenshots/hexswarm_tools.png" alt="hexswarm tools output listing all 17 registered tools with category, risk level, binary, and install status, color-coded by risk" width="700"></p>
-
-**`hexswarm run`**, a real recon pass against scanme.nmap.org through the full phase pipeline, each phase's output and the final report rendered as Markdown panels:
-
-<p align="center"><img src="docs/screenshots/hexswarm_run.png" alt="hexswarm run showing recon, scan, exploit, and privesc phase panels followed by the final Markdown assessment report" width="700"></p>
-
-**`hexswarm ctf`**, identifying and decoding a challenge file end to end:
-
-<p align="center"><img src="docs/screenshots/hexswarm_ctf.png" alt="hexswarm ctf identifying a file as ASCII text and decoding its Base64 content to recover the flag" width="700"></p>
+<p align="center"><img src="docs/screenshots/hexswarm_playbooks.png" alt="hexswarm playbooks listing recon-only, web-assessment, and full-engagement presets with their phases and max risk level" width="720"></p>
 
 <details>
-<summary>hexswarm scope-check and --help</summary>
+<summary>More: init wizard, doctor, CTF, scope-check, help</summary>
 
-<p align="center"><img src="docs/screenshots/hexswarm_scope_check.png" alt="hexswarm scope-check showing an authorized target accepted and an out-of-scope target rejected" width="700"></p>
-
-<p align="center"><img src="docs/screenshots/hexswarm_help.png" alt="hexswarm --help output listing the version, tools, scope-check, run, and ctf commands" width="700"></p>
+<p align="center"><img src="docs/screenshots/hexswarm_init.png" alt="hexswarm init interactive wizard" width="700"></p>
+<p align="center"><img src="docs/screenshots/hexswarm_doctor.png" alt="hexswarm doctor readiness check" width="700"></p>
+<p align="center"><img src="docs/screenshots/hexswarm_ctf.png" alt="hexswarm ctf identifying a file and decoding its Base64 content to recover the flag" width="700"></p>
+<p align="center"><img src="docs/screenshots/hexswarm_scope_check.png" alt="hexswarm scope-check accepting an authorized target and rejecting an out-of-scope one" width="700"></p>
+<p align="center"><img src="docs/screenshots/hexswarm_help.png" alt="hexswarm --help command list" width="700"></p>
 
 </details>
 

@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" width="1200" height="620" role="img" aria-label="HexSwarm architecture: a goal and scope flow through a swarm of phase agents, every tool call gated by the scope guard and metered by the budget, producing findings with evidence and reports.">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#05120e"/><stop offset="1" stop-color="#0a1f1a"/></linearGradient>
+<linearGradient id="ac" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1f6f54"/><stop offset="1" stop-color="#5fd9a4"/></linearGradient>
+<pattern id="hex" width="56" height="97" patternUnits="userSpaceOnUse" patternTransform="scale(0.9)">
+<path d="M28 0 L56 16 V48 L28 64 L0 48 V16 Z M28 64 V97 M0 48 L-28 64 M56 48 L84 64" fill="none" stroke="#5fd9a4" stroke-opacity="0.07" stroke-width="1.1"/></pattern>
+<marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#5fd9a4"/></marker>
+<style>
+  .t{font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif}
+  .title{font-weight:800;fill:#ffffff}
+  .lbl{font-weight:700;fill:#e6fff4}
+  .sub{font-weight:400;fill:#9fdcc0}
+  .mono{font-family:'Cascadia Mono','Consolas',monospace;fill:#c9f5e5}
+  .eyebrow{font-weight:700;fill:#5fd9a4;letter-spacing:2.5px}
+  .gate{font-weight:700;fill:#06140f}
+</style>
+</defs>
+<rect width="1200" height="620" fill="url(#bg)"/>
+<rect width="1200" height="620" fill="url(#hex)"/>
+<rect x="0" y="0" width="8" height="620" fill="url(#ac)"/>
+
+<text x="40" y="52" class="t eyebrow" font-size="13">HEXSWARM ARCHITECTURE</text>
+<text x="40" y="86" class="t title" font-size="30">One goal, one scope, an auditable swarm</text>
+
+<!-- inputs -->
+<g transform="translate(40,130)">
+  <rect width="210" height="90" rx="12" fill="#ffffff" fill-opacity="0.05" stroke="#5fd9a4" stroke-opacity="0.4"/>
+  <text x="18" y="30" class="t lbl" font-size="15">Goal (plain English)</text>
+  <text x="18" y="54" class="t mono" font-size="12">"find a web server and</text>
+  <text x="18" y="72" class="t mono" font-size="12"> check for common vulns"</text>
+</g>
+<g transform="translate(40,240)">
+  <rect width="210" height="78" rx="12" fill="#ffffff" fill-opacity="0.05" stroke="#5fd9a4" stroke-opacity="0.4"/>
+  <text x="18" y="30" class="t lbl" font-size="15">scope.yaml</text>
+  <text x="18" y="54" class="t sub" font-size="12">allow / deny + max risk tier</text>
+</g>
+
+<!-- model router -->
+<g transform="translate(40,360)">
+  <rect width="210" height="96" rx="12" fill="#ffffff" fill-opacity="0.05" stroke="#5fd9a4" stroke-opacity="0.4"/>
+  <text x="18" y="30" class="t lbl" font-size="15">LLM router</text>
+  <text x="18" y="54" class="t sub" font-size="12">OpenAI / Anthropic /</text>
+  <text x="18" y="72" class="t sub" font-size="12">Ollama / 100+ (LiteLLM)</text>
+</g>
+
+<!-- arrows into swarm -->
+<path d="M250 175 H300" stroke="#5fd9a4" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+<path d="M250 279 H300" stroke="#5fd9a4" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+<path d="M250 408 H300" stroke="#5fd9a4" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+
+<!-- swarm pipeline -->
+<g transform="translate(300,120)">
+  <rect width="560" height="360" rx="16" fill="#ffffff" fill-opacity="0.03" stroke="#5fd9a4" stroke-opacity="0.3"/>
+  <text x="24" y="34" class="t sub" font-size="13">AGENT SWARM</text>
+
+  <!-- phase chips -->
+  <g>
+    <g transform="translate(24,52)"><rect width="150" height="44" rx="10" fill="url(#ac)"/><text x="75" y="28" text-anchor="middle" class="t gate" font-size="14">Recon</text></g>
+    <g transform="translate(205,52)"><rect width="150" height="44" rx="10" fill="url(#ac)"/><text x="75" y="28" text-anchor="middle" class="t gate" font-size="14">Scan</text></g>
+    <g transform="translate(386,52)"><rect width="150" height="44" rx="10" fill="url(#ac)"/><text x="75" y="28" text-anchor="middle" class="t gate" font-size="14">Exploit</text></g>
+    <g transform="translate(24,116)"><rect width="150" height="44" rx="10" fill="url(#ac)"/><text x="75" y="28" text-anchor="middle" class="t gate" font-size="14">Privesc</text></g>
+    <g transform="translate(205,116)"><rect width="150" height="44" rx="10" fill="#ffffff" fill-opacity="0.08" stroke="#5fd9a4" stroke-opacity="0.5"/><text x="75" y="28" text-anchor="middle" class="t lbl" font-size="14">Verify</text></g>
+    <g transform="translate(386,116)"><rect width="150" height="44" rx="10" fill="#ffffff" fill-opacity="0.08" stroke="#5fd9a4" stroke-opacity="0.5"/><text x="75" y="28" text-anchor="middle" class="t lbl" font-size="14">Report</text></g>
+    <path d="M174 74 H205" stroke="#5fd9a4" stroke-width="2" marker-end="url(#arr)"/>
+    <path d="M355 74 H386" stroke="#5fd9a4" stroke-width="2" marker-end="url(#arr)"/>
+    <path d="M174 138 H205" stroke="#5fd9a4" stroke-width="2" marker-end="url(#arr)"/>
+    <path d="M355 138 H386" stroke="#5fd9a4" stroke-width="2" marker-end="url(#arr)"/>
+  </g>
+
+  <!-- shared findings store -->
+  <g transform="translate(24,186)">
+    <rect width="512" height="54" rx="10" fill="#ffffff" fill-opacity="0.05" stroke="#5fd9a4" stroke-opacity="0.35"/>
+    <text x="18" y="24" class="t lbl" font-size="14">Shared findings store</text>
+    <text x="18" y="42" class="t sub" font-size="12">every finding: command + real/simulated flag + sha256 evidence</text>
+  </g>
+
+  <!-- gate + budget bars -->
+  <g transform="translate(24,256)">
+    <rect width="512" height="38" rx="9" fill="#5fd9a4" fill-opacity="0.18" stroke="#5fd9a4" stroke-opacity="0.6"/>
+    <text x="256" y="24" text-anchor="middle" class="t lbl" font-size="13">SCOPE GUARD, every tool call checked in code beneath the LLM</text>
+  </g>
+  <g transform="translate(24,302)">
+    <rect width="512" height="38" rx="9" fill="#ffffff" fill-opacity="0.06" stroke="#5fd9a4" stroke-opacity="0.45"/>
+    <text x="256" y="24" text-anchor="middle" class="t sub" font-size="13">BUDGET + TRACE, token/cost ceiling + JSONL of every call</text>
+  </g>
+</g>
+
+<!-- tools layer -->
+<g transform="translate(910,120)">
+  <rect width="250" height="200" rx="14" fill="#ffffff" fill-opacity="0.04" stroke="#5fd9a4" stroke-opacity="0.3"/>
+  <text x="20" y="32" class="t sub" font-size="13">TOOLS (scope-gated)</text>
+  <text x="20" y="62" class="t sub" font-size="12">nmap, nuclei, sqlmap,</text>
+  <text x="20" y="82" class="t sub" font-size="12">hydra, gobuster, httpx,</text>
+  <text x="20" y="102" class="t sub" font-size="12">naabu, katana, metasploit</text>
+  <text x="20" y="130" class="t sub" font-size="12">CTF + AI-app probes</text>
+  <text x="20" y="158" class="t sub" font-size="12">+ any MCP server's tools</text>
+  <text x="20" y="184" class="t mono" font-size="11">host | docker sandbox</text>
+</g>
+<path d="M860 220 H910" stroke="#5fd9a4" stroke-width="2" fill="none" marker-end="url(#arr)" marker-start="url(#arr)"/>
+
+<!-- outputs -->
+<g transform="translate(910,360)">
+  <rect width="250" height="120" rx="14" fill="#ffffff" fill-opacity="0.04" stroke="#5fd9a4" stroke-opacity="0.3"/>
+  <text x="20" y="32" class="t sub" font-size="13">OUTPUT</text>
+  <text x="20" y="60" class="t lbl" font-size="13">Markdown report</text>
+  <text x="20" y="84" class="t lbl" font-size="13">SARIF (GitHub Security)</text>
+  <text x="20" y="108" class="t lbl" font-size="13">structured JSON + trace</text>
+</g>
+<path d="M860 420 H910" stroke="#5fd9a4" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+
+<!-- also exposed as MCP server -->
+<g transform="translate(300,502)">
+  <rect width="860" height="74" rx="12" fill="#ffffff" fill-opacity="0.04" stroke="#5fd9a4" stroke-opacity="0.3"/>
+  <text x="24" y="30" class="t lbl" font-size="14">Also an MCP server</text>
+  <text x="24" y="52" class="t sub" font-size="12.5">the same scope-gated tools exposed to Claude Desktop, Claude Code, or Kali's native MCP workflow, over stdio</text>
+</g>
+<path d="M730 480 V502" stroke="#5fd9a4" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+
+<text x="40" y="596" class="t sub" font-size="12">Linear, predictable ordering by design: a security tool's behavior should be auditable, not emergent.</text>
+</svg>

@@ -141,3 +141,42 @@ def test_router_unmetered_when_no_telemetry_or_budget():
     router = LLMRouter(primary_model="fake/model", completion_fn=fn)
     resp = router.complete([LLMMessage(role="user", content="go")])
     assert resp.content == "ok"  # behaves exactly as before, nothing tracked
+
+
+def test_agent_records_tool_calls_into_the_trace():
+    # The trace must capture tool calls, not just LLM calls: a run that executes a tool
+    # should show tool_calls > 0 in the telemetry, otherwise the "cost/usage" line lies.
+    from hexswarm.agents.base import Agent, AgentConfig
+    from hexswarm.safety.guard import ScopeGuard, ToolRiskLevel
+    from hexswarm.tools.base import ToolRegistry
+
+    tc = SimpleNamespace(
+        id="c1",
+        function=SimpleNamespace(name="whois_lookup", arguments='{"target": "example.com"}'),
+    )
+    calls = {"n": 0}
+
+    def fn(**kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            msg = SimpleNamespace(content="", tool_calls=[tc])
+        else:
+            msg = SimpleNamespace(content="done", tool_calls=[])
+        return SimpleNamespace(choices=[SimpleNamespace(message=msg)],
+                               usage=SimpleNamespace(prompt_tokens=10, completion_tokens=5))
+
+    telemetry = Telemetry(engagement_name="t")
+    router = LLMRouter(primary_model="fake/model", completion_fn=fn, telemetry=telemetry)
+    tool = ToolRegistry.get("whois_lookup")
+    agent = Agent(config=AgentConfig(name="recon_agent", phase="recon", system_prompt="x", tools=[tool]), router=router)
+
+    from hexswarm.memory.findings import FindingsStore
+
+    guard = ScopeGuard(engagement_name="t", allow=["example.com"], max_risk_level=ToolRiskLevel.POST_EXPLOIT)
+    agent.run(goal="g", target="example.com", guard=guard, findings=FindingsStore(engagement_name="t"))
+
+    assert telemetry.tool_calls == 1
+    assert telemetry.llm_calls == 2
+    tool_events = [e for e in telemetry.events if e.kind == "tool_call"]
+    assert tool_events[0].detail["tool_name"] == "whois_lookup"
+    assert tool_events[0].detail["phase"] == "recon"

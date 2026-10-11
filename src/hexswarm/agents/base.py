@@ -171,6 +171,18 @@ class Agent:
                 simulated=result.simulated,
             )
         )
+        # Record the tool call into the engagement trace, if one is attached (via the
+        # router). The trace's whole purpose is "every LLM call AND every tool call", so
+        # the tool side has to be wired in here, not just the LLM side in the router.
+        telemetry = getattr(self.router, "telemetry", None)
+        if telemetry is not None:
+            telemetry.record_tool_call(
+                tool_name=tool.name,
+                target=result.target,
+                simulated=result.simulated,
+                success=result.success,
+                phase=self.config.phase,
+            )
         prefix = "[SIMULATED] " if result.simulated else ""
         status = "succeeded" if result.success else "failed"
         return f"{prefix}Tool '{tool_name}' {status}.\nOutput:\n{result.output}\nError:\n{result.error}"
