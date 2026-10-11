@@ -1,0 +1,77 @@
+# Finding -> control mapping rules.
+#
+# This maps a technical finding to the ISO 27001:2022 Annex A controls and PCI
+# DSS 4.0 requirements it RELATES TO. It is advisory, not a compliance verdict:
+# whether an environment is compliant is an assessor's judgement based on
+# scope, policies, and evidence far beyond one pentest. A mapping here means
+# "this finding touches that control", so an assessor knows where to look, not
+# "you pass" or "you fail".
+#
+# Each rule matches a finding by tool name and/or case-insensitive keywords in
+# its summary. Control identifiers follow ISO/IEC 27001:2022 Annex A and PCI
+# DSS v4.0; verify the exact clause against the current published standard
+# before citing it in a formal report.
+
+rules:
+  - id: weak-or-default-credentials
+    match_tools: ["password_brute_force", "exploit_search"]
+    match_keywords: ["default password", "default credential", "weak password", "anonymous login", "blank password", "default creds"]
+    iso27001: ["A.5.17 Authentication information", "A.8.5 Secure authentication"]
+    pci_dss: ["2.2.2 Vendor default accounts managed", "8.3.1 Strong authentication", "8.3.6 Password length and complexity"]
+    rationale: "Default or weak credentials on a reachable service are a direct authentication-control weakness."
+
+  - id: sql-injection
+    match_tools: ["sql_injection_scan"]
+    match_keywords: ["sql injection", "sqli"]
+    iso27001: ["A.8.28 Secure coding", "A.8.26 Application security requirements"]
+    pci_dss: ["6.2.4 Secure coding against injection", "6.3 Security vulnerabilities identified and addressed"]
+    rationale: "Injection is an application-layer flaw tied to secure-development controls."
+
+  - id: web-vulnerability
+    match_tools: ["web_vuln_scan", "directory_brute", "web_crawl"]
+    match_keywords: ["xss", "cross-site", "csrf", "ssrf", "idor", "exposed", "misconfiguration", "directory listing", "backup file"]
+    iso27001: ["A.8.26 Application security requirements", "A.8.9 Configuration management"]
+    pci_dss: ["6.2 Bespoke and custom software developed securely", "6.4.1 Public-facing web apps protected"]
+    rationale: "Web-layer findings relate to application-security and configuration controls."
+
+  - id: outdated-or-unpatched-service
+    match_tools: ["port_scan", "http_fingerprint", "web_vuln_scan", "exploit_search"]
+    match_keywords: ["outdated", "end of life", "eol", "unpatched", "known cve", "cve-", "vulnerable version", "old version"]
+    iso27001: ["A.8.8 Management of technical vulnerabilities"]
+    pci_dss: ["6.3.1 Security vulnerabilities identified", "6.3.3 Patch critical vulnerabilities (within one month)"]
+    rationale: "A running version with known vulnerabilities maps to vulnerability-management and patching controls."
+
+  - id: weak-transport-encryption
+    match_tools: ["http_fingerprint", "web_vuln_scan", "port_scan"]
+    match_keywords: ["tls 1.0", "tls 1.1", "sslv3", "ssl 3", "weak cipher", "self-signed", "expired certificate", "cleartext", "http only", "no encryption"]
+    iso27001: ["A.8.24 Use of cryptography", "A.8.20 Network security"]
+    pci_dss: ["4.2.1 Strong cryptography for transmission over open networks"]
+    rationale: "Weak or absent transport encryption maps to cryptography and network-transmission controls."
+
+  - id: exposed-network-service
+    match_tools: ["port_scan", "fast_port_scan", "dns_enum", "dns_resolve", "http_probe"]
+    match_keywords: ["open port", "exposed service", "unnecessary service", "telnet", "ftp open", "rdp open", "smb open", "database exposed", "redis", "mongodb", "elasticsearch"]
+    iso27001: ["A.8.20 Network security", "A.8.21 Security of network services", "A.8.9 Configuration management"]
+    pci_dss: ["1.2 Network security controls configured", "2.2.5 Unnecessary services removed or secured"]
+    rationale: "An exposed or unnecessary network service maps to network-security and secure-configuration controls."
+
+  - id: exploitation-foothold
+    match_tools: ["metasploit_module_run"]
+    match_keywords: ["shell", "remote code execution", "rce", "foothold", "exploited", "reverse shell"]
+    iso27001: ["A.8.8 Management of technical vulnerabilities", "A.8.7 Protection against malware"]
+    pci_dss: ["6.3 Security vulnerabilities addressed", "11.4.1 External and internal penetration testing"]
+    rationale: "A proven exploitation path demonstrates an exploitable vulnerability the vulnerability-management and pentest requirements expect to be found and fixed."
+
+  - id: privilege-escalation
+    match_tools: ["linux_privesc_enum", "windows_privesc_enum"]
+    match_keywords: ["privilege escalation", "suid", "misconfigured service", "writable", "unquoted path", "stored credential", "alwaysinstallelevated"]
+    iso27001: ["A.8.2 Privileged access rights", "A.8.9 Configuration management"]
+    pci_dss: ["7.2 Access to system components restricted", "2.2 Secure system configuration"]
+    rationale: "Local privilege-escalation vectors map to privileged-access and secure-configuration controls."
+
+  - id: prompt-injection-ai-app
+    match_tools: ["prompt_injection_probe"]
+    match_keywords: ["prompt injection", "system prompt", "jailbreak", "flagged"]
+    iso27001: ["A.8.26 Application security requirements", "A.8.28 Secure coding"]
+    pci_dss: ["6.2 Bespoke and custom software developed securely"]
+    rationale: "Prompt-injection weaknesses in an AI-backed application are an application-security concern; note PCI DSS has no AI-specific requirement, this is the closest existing control area."

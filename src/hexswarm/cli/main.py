@@ -712,5 +712,54 @@ def lab(
             )
 
 
+@app.command()
+def compliance(
+    findings_file: Path = typer.Option(
+        ..., "--findings", "-f",
+        help="A findings JSON from a prior run (hexswarm run --findings-out).",
+    ),
+    framework: str = typer.Option(
+        "all", "--framework",
+        help="Which controls to map to: iso27001, pci-dss, or all.",
+    ),
+    out: Path = typer.Option(
+        Path("compliance_mapping.md"), "--out", help="Where to write the Markdown mapping."
+    ),
+) -> None:
+    """Map a run's findings to the ISO 27001 / PCI DSS controls they relate to (advisory).
+
+    This is NOT a compliance verdict: it points at the controls each finding touches so an
+    assessor knows where to look. Whether you pass a framework is their judgement, not this.
+    """
+    from hexswarm.compliance import FRAMEWORKS, to_markdown
+    from hexswarm.memory.findings import FindingsStore
+
+    if not findings_file.exists():
+        console.print(f"[red]Findings file not found[/red]: {findings_file}")
+        raise typer.Exit(code=1)
+
+    if framework == "all":
+        frameworks = set(FRAMEWORKS)
+    elif framework in FRAMEWORKS:
+        frameworks = {framework}
+    else:
+        console.print(f"[red]Unknown framework '{framework}'[/red] (expected iso27001, pci-dss, or all).")
+        raise typer.Exit(code=1)
+
+    store = FindingsStore(engagement_name="compliance", persist_path=findings_file)
+    if not store.all():
+        console.print("[yellow]No findings in that file.[/yellow]")
+        raise typer.Exit(code=1)
+
+    markdown = to_markdown(store, frameworks=frameworks)
+    out.write_text(markdown, encoding="utf-8")
+    console.print(Panel(Markdown(markdown), title="COMPLIANCE MAPPING", border_style="cyan"))
+    console.print(f"\n[green]Mapping written to {out}[/green]")
+    console.print(
+        "[dim]Advisory mapping only. Not a compliance assessment; the pass/fail judgement is "
+        "the assessor's.[/dim]"
+    )
+
+
 if __name__ == "__main__":
     app()

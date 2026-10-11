@@ -385,3 +385,39 @@ def test_run_mcp_config_registers_remote_tools(tmp_path, monkeypatch):
     # cleanup global registry so the injected tool doesn't leak into other tests
     ToolRegistry.all().pop("svc.demo_scan", None)
     ToolRegistry._tools.pop("svc.demo_scan", None)
+
+
+def test_compliance_command_maps_findings(tmp_path):
+    import json
+    findings_json = tmp_path / "findings.json"
+    findings_json.write_text(json.dumps({
+        "engagement_name": "demo",
+        "findings": [
+            {"phase": "scan", "tool_name": "sql_injection_scan", "target": "http://x",
+             "summary": "SQL injection found", "severity": "high", "raw_output": "", "timestamp": "t"},
+        ],
+    }), encoding="utf-8")
+    out = tmp_path / "mapping.md"
+    result = runner.invoke(app, ["compliance", "--findings", str(findings_json), "--out", str(out)])
+    assert result.exit_code == 0, result.stdout
+    assert out.exists()
+    text = out.read_text(encoding="utf-8")
+    assert "6.2.4" in text or "Secure coding" in text
+    assert "advisory" in text.lower()
+
+
+def test_compliance_command_missing_file(tmp_path):
+    result = runner.invoke(app, ["compliance", "--findings", str(tmp_path / "nope.json")])
+    assert result.exit_code == 1
+    assert "not found" in result.stdout.lower()
+
+
+def test_compliance_command_unknown_framework(tmp_path):
+    import json
+    fj = tmp_path / "f.json"
+    fj.write_text(json.dumps({"engagement_name": "d", "findings": [
+        {"phase": "scan", "tool_name": "sql_injection_scan", "target": "x", "summary": "sqli",
+         "severity": "high", "raw_output": "", "timestamp": "t"}]}), encoding="utf-8")
+    result = runner.invoke(app, ["compliance", "--findings", str(fj), "--framework", "hipaa"])
+    assert result.exit_code == 1
+    assert "Unknown framework" in result.stdout
