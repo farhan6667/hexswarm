@@ -22,6 +22,21 @@ def test_registry_contains_expected_tools():
         assert expected in names
 
 
+def test_registry_contains_projectdiscovery_recon_tools():
+    names = ToolRegistry.all()
+    for expected in ["http_probe", "fast_port_scan", "web_crawl", "dns_resolve"]:
+        assert expected in names
+        assert names[expected].risk_level in (ToolRiskLevel.READ_ONLY, ToolRiskLevel.ACTIVE_RECON)
+
+
+def test_projectdiscovery_tools_build_commands():
+    from hexswarm.tools.base import ToolRegistry as TR
+    assert TR.get("http_probe").build_command(target="https://example.com")[0] == "httpx"
+    assert TR.get("fast_port_scan").build_command(target="10.0.0.0/24")[0] == "naabu"
+    assert TR.get("web_crawl").build_command(target="https://example.com")[0] == "katana"
+    assert TR.get("dns_resolve").build_command(target="example.com")[0] == "dnsx"
+
+
 def test_port_scan_builds_expected_command():
     tool = PortScan()
     cmd = tool.build_command(target="scanme.nmap.org", ports="22,80")

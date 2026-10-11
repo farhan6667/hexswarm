@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from hexswarm.agents.base import Agent, ConfirmFn
-from hexswarm.agents.specialized import build_phase_agents
+from hexswarm.agents.specialized import build_phase_agents, build_verify_agent
 from hexswarm.llm.router import LLMRouter
 from hexswarm.memory.findings import FindingsStore
 from hexswarm.memory.knowledge import KnowledgeBase
@@ -51,12 +51,14 @@ class Orchestrator:
         models: dict[str, str] | None = None,
         phase_order: list[str] | None = None,
         progress_callback: ProgressCallback | None = None,
+        verify: bool = False,
     ) -> None:
         self.router = router
         self.scope_guard = scope_guard
         self.findings = findings or FindingsStore(engagement_name=scope_guard.engagement_name)
         self.phase_order = phase_order or list(DEFAULT_PHASE_ORDER)
         self.progress_callback = progress_callback
+        self.verify = verify
         self.agents: dict[str, Agent] = build_phase_agents(
             router=router,
             knowledge_base=knowledge_base,
@@ -64,6 +66,8 @@ class Orchestrator:
             confirm_fn=confirm_fn,
             models=models,
         )
+        if verify:
+            self.agents["verify"] = build_verify_agent(router=router, model=(models or {}).get("verify"))
 
     def _notify(self, event: str, phase: str) -> None:
         if self.progress_callback is not None:
@@ -104,6 +108,18 @@ class Orchestrator:
                 return result
             result.phase_summaries[phase] = summary
             self._notify("done", phase)
+
+        if self.verify:
+            self._notify("start", "verify")
+            try:
+                verdict = self.agents["verify"].run(
+                    goal=goal, target=target, guard=self.scope_guard, findings=self.findings
+                )
+            except BudgetExceeded as exc:
+                verdict = f"Verification skipped: {exc}"
+                result.budget_exceeded = True
+            result.phase_summaries["verify"] = verdict
+            self._notify("done", "verify")
 
         self._notify("start", "report")
         result.report_markdown = self._generate_report(goal, target)

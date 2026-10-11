@@ -81,7 +81,69 @@ class HttpFingerprint(Tool):
         return [self.binary, "-a", "3", kwargs["target"]]
 
 
+class HttpProbe(Tool):
+    name: ClassVar[str] = "http_probe"
+    description: ClassVar[str] = (
+        "Probes a host or list of hosts for live HTTP/HTTPS services using httpx (ProjectDiscovery), "
+        "reporting status code, title, and detected technologies. Use this to turn a list of hosts "
+        "from DNS enumeration into the subset that actually serves web content."
+    )
+    binary: ClassVar[str] = "httpx"
+    risk_level: ClassVar[ToolRiskLevel] = ToolRiskLevel.ACTIVE_RECON
+    timeout_seconds: ClassVar[int] = 120
+
+    def build_command(self, **kwargs: Any) -> list[str]:
+        return [self.binary, "-u", kwargs["target"], "-silent", "-title", "-status-code", "-tech-detect"]
+
+
+class FastPortScan(Tool):
+    name: ClassVar[str] = "fast_port_scan"
+    description: ClassVar[str] = (
+        "Fast SYN/CONNECT port discovery across a host or CIDR using naabu (ProjectDiscovery). "
+        "Faster than a full nmap -sV sweep for finding which ports are open; follow up with "
+        "port_scan for service/version detail on the ports naabu reports."
+    )
+    binary: ClassVar[str] = "naabu"
+    risk_level: ClassVar[ToolRiskLevel] = ToolRiskLevel.ACTIVE_RECON
+    timeout_seconds: ClassVar[int] = 180
+
+    def build_command(self, **kwargs: Any) -> list[str]:
+        return [self.binary, "-host", kwargs["target"], "-silent"]
+
+
+class WebCrawl(Tool):
+    name: ClassVar[str] = "web_crawl"
+    description: ClassVar[str] = (
+        "Crawls a web target to enumerate endpoints, URLs, and parameters using katana "
+        "(ProjectDiscovery). Use this to map a web app's surface before vulnerability scanning."
+    )
+    binary: ClassVar[str] = "katana"
+    risk_level: ClassVar[ToolRiskLevel] = ToolRiskLevel.ACTIVE_RECON
+    timeout_seconds: ClassVar[int] = 300
+
+    def build_command(self, **kwargs: Any) -> list[str]:
+        return [self.binary, "-u", kwargs["target"], "-silent"]
+
+
+class DnsResolve(Tool):
+    name: ClassVar[str] = "dns_resolve"
+    description: ClassVar[str] = (
+        "Resolves and validates DNS records for a host or list of hosts using dnsx "
+        "(ProjectDiscovery), filtering a candidate list down to the ones that actually resolve."
+    )
+    binary: ClassVar[str] = "dnsx"
+    risk_level: ClassVar[ToolRiskLevel] = ToolRiskLevel.READ_ONLY
+    timeout_seconds: ClassVar[int] = 90
+
+    def build_command(self, **kwargs: Any) -> list[str]:
+        return [self.binary, "-d", kwargs["target"], "-silent", "-a", "-resp"]
+
+
 ToolRegistry.register(WhoisLookup())
 ToolRegistry.register(DnsEnum())
 ToolRegistry.register(PortScan())
 ToolRegistry.register(HttpFingerprint())
+ToolRegistry.register(HttpProbe())
+ToolRegistry.register(FastPortScan())
+ToolRegistry.register(WebCrawl())
+ToolRegistry.register(DnsResolve())

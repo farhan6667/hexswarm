@@ -164,3 +164,42 @@ def build_ai_security_agent(
         max_steps=max_steps,
     )
     return Agent(config=config, router=router)
+
+
+VERIFY_PROMPT = """You are the Verify agent in HexSwarm, a second-opinion reviewer whose only
+job is to catch false positives before they reach the report. You have no tools. You receive
+the full findings log, including, for each finding, whether the underlying tool call was
+SIMULATED (no real tool ran) and the evidence behind it.
+
+For each finding of medium severity or higher, judge whether the evidence actually supports
+the claim:
+- A finding from a SIMULATED tool call can never be a confirmed vulnerability; say so plainly.
+- A finding whose evidence doesn't clearly demonstrate the claimed issue is a likely false
+  positive; flag it and say what's missing.
+- A finding whose evidence does support it is a likely true positive; say briefly why.
+
+Be skeptical: it is better to tell the operator "this needs a human to confirm" than to let a
+shaky finding look settled. Output a short verdict list, one line per reviewed finding:
+`<tool_name> on <target>: LIKELY TRUE POSITIVE | LIKELY FALSE POSITIVE | UNVERIFIABLE (simulated)`
+followed by one clause of reasoning. End with a one-line count of how many look real versus
+shaky. Do not invent findings that aren't in the log."""
+
+
+def build_verify_agent(
+    router: LLMRouter,
+    model: str | None = None,
+) -> Agent:
+    """Builds the false-positive / second-opinion review agent (no tools).
+
+    Runs after the action phases and before the report, reviewing the accumulated findings
+    rather than touching the target again, so it adds a verification pass without any extra
+    tool execution against the target.
+    """
+    config = AgentConfig(
+        name="verify_agent",
+        phase="verify",
+        system_prompt=VERIFY_PROMPT,
+        tools=[],
+        model=model,
+    )
+    return Agent(config=config, router=router)

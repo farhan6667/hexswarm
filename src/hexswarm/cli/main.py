@@ -304,6 +304,10 @@ def run(
     sarif_out: Path = typer.Option(
         None, "--sarif-out", help="Optional SARIF path (for GitHub code scanning) of the findings."
     ),
+    verify: bool = typer.Option(
+        False, "--verify",
+        help="Add a second-opinion verification pass that flags likely false positives before the report.",
+    ),
 ) -> None:
     """Run the full recon -> scan -> exploit -> privesc -> report swarm against a target."""
     settings = load_settings()
@@ -396,6 +400,7 @@ def run(
             human_in_the_loop=settings.human_in_the_loop,
             progress_callback=on_progress,
             phase_order=phase_order,
+            verify=verify,
         )
         result = orchestrator.run(goal=goal, target=target)
 
