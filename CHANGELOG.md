@@ -3,7 +3,7 @@
 All notable changes to HexSwarm are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.2.0] - 2026-10-11
 
 ### Added
 - MCP (Model Context Protocol) support, both directions: `hexswarm mcp-server` exposes the
