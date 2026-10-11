@@ -1,0 +1,107 @@
+name: lab-validation
+
+# Validates the real pipeline against a real vulnerable app (OWASP Juice Shop),
+# the honest end-to-end check that simulate-mode unit tests can't give. Runs the
+# real web toolchain against a live Juice Shop and maps the findings through the
+# compliance layer. This is the 1.0 gate for "validated against a real target".
+#
+# The deterministic part (tool-level scan + compliance mapping) needs no API key.
+# A full LLM-driven run is an extra step that only fires if OPENAI_API_KEY or
+# ANTHROPIC_API_KEY is set as a repo secret, so the workflow is green either way.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly, so a drifted Juice Shop image or a broken tool gets caught.
+    - cron: "0 7 * * 2"
+  push:
+    branches: [main]
+    paths:
+      - "src/hexswarm/compliance.py"
+      - "src/hexswarm/data/compliance/**"
+      - "src/hexswarm/labs.py"
+      - "examples/labs/**"
+      - "ci/lab_validate.py"
+      - "Dockerfile.toolchain"
+      - ".github/workflows/lab-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  lab-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the toolchain image (current code, with the web tools)
+        run: docker build -f Dockerfile.toolchain -t hexswarm-toolchain:ci .
+
+      - name: Start OWASP Juice Shop
+        run: |
+          docker network create hexnet
+          docker run -d --name juice-shop --network hexnet -p 3000:3000 bkimminich/juice-shop:latest
+          echo "waiting for Juice Shop to answer..."
+          for i in $(seq 1 90); do
+            if curl -sf http://localhost:3000/ >/dev/null 2>&1; then echo "Juice Shop is up"; break; fi
+            sleep 2
+          done
+          curl -sf http://localhost:3000/ >/dev/null || { echo "::error::Juice Shop did not start"; docker logs juice-shop | tail -40; exit 1; }
+
+      - name: Real web tools against the lab, then map findings to compliance
+        run: |
+          docker run --name labval --network hexnet \
+            -v "$PWD/ci:/ci" \
+            --entrypoint python3 hexswarm-toolchain:ci \
+            /ci/lab_validate.py http://juice-shop:3000 /tmp/lab-out
+          docker cp labval:/tmp/lab-out ./lab-out || true
+          docker rm -f labval || true
+          echo "---- compliance mapping produced ----"
+          cat ./lab-out/lab_compliance_mapping.md || true
+
+      - name: Upload the lab findings and compliance mapping
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab-compliance-mapping
+          path: lab-out/
+          if-no-files-found: warn
+
+      - name: Full LLM-driven run against the lab (only if a model key is set)
+        continue-on-error: true
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "No model key configured as a repo secret; skipping the LLM-driven run."
+            echo "The deterministic tool-level lab validation above already ran for real."
+            exit 0
+          fi
+          cat > lab-scope.yaml <<'EOF'
+          engagement_name: "juice-shop-ci-lab"
+          allow:
+            - "juice-shop"
+            - "localhost"
+            - "127.0.0.1"
+          deny: []
+          max_risk_level: "intrusive"
+          authorized_by: "CI lab (disposable container)"
+          notes: "OWASP Juice Shop in CI, disposable."
+          EOF
+          if [ -n "$OPENAI_API_KEY" ]; then MODEL="openai/gpt-4o-mini"; else MODEL="anthropic/claude-sonnet-5"; fi
+          echo "Running the full pipeline with $MODEL"
+          docker run --rm --network hexnet \
+            -e OPENAI_API_KEY -e ANTHROPIC_API_KEY \
+            -e HEXSWARM_PRIMARY_MODEL="$MODEL" \
+            -v "$PWD/lab-scope.yaml:/lab-scope.yaml" \
+            hexswarm-toolchain:ci \
+            run --goal "Assess this web app for common web vulnerabilities" \
+                --target http://juice-shop:3000 --scope /lab-scope.yaml --yes \
+                --playbook web-assessment
+
+      - name: Tear down the lab
+        if: always()
+        run: |
+          docker rm -f juice-shop || true
+          docker network rm hexnet || true
