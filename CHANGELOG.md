@@ -6,6 +6,9 @@ All notable changes to HexSwarm are documented here. Format loosely follows
 ## [Unreleased]
 
 ### Added
+- A branded CLI banner (the HexSwarm wordmark, version, and the NexaForge / SFA line) shown at the
+  top of `version`, `doctor`, `run`, and `ctf`, plus a consistent cyan theme on the tool and playbook
+  tables, so the terminal output looks like a finished product rather than raw prints.
 - Five new tool adapters wrapping well-known open-source scanners, each scope-gated and risk-tiered
   like the rest: `subdomain_enum` (OWASP Amass, passive subdomain and attack-surface enumeration),
   `osint_harvest` (theHarvester, passive email/name/host OSINT), `subdomain_takeover` (SubOver,

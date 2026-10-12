@@ -6,7 +6,9 @@ import urllib.request
 from pathlib import Path
 
 import typer
-from rich.console import Console
+from rich import box
+from rich.align import Align
+from rich.console import Console, Group
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
@@ -36,6 +38,23 @@ app = typer.Typer(
 console = Console()
 
 
+def render_banner() -> Panel:
+    """The HexSwarm wordmark banner, shown at the top of the main commands."""
+    emblem = Align.center("[bright_cyan] __\n/  \\\n\\__/[/bright_cyan]")
+    wordmark = Align.center(
+        f"[bold bright_cyan]H E X S W A R M[/bold bright_cyan]   [dim]v{__version__}[/dim]"
+    )
+    subtitle = Align.center("[cyan]scope-gated AI agents for offensive security[/cyan]")
+    tagline = Align.center(f"[dim]{TAGLINE}[/dim]")
+    links = Align.center(f"[dim]{SITE}  |  {REPO_URL}[/dim]")
+    body = Group(emblem, wordmark, subtitle, Align.center(""), tagline, links)
+    return Panel(body, border_style="cyan", box=box.ROUNDED, padding=(1, 4))
+
+
+def print_banner() -> None:
+    console.print(render_banner())
+
+
 def _apply_sandbox(settings: Settings) -> None:
     configure_sandbox(
         mode=settings.sandbox_mode,
@@ -55,9 +74,7 @@ MODEL_PRESETS = {
 @app.command()
 def version() -> None:
     """Print the installed HexSwarm version."""
-    console.print(f"[bold cyan]HexSwarm[/bold cyan] [bold]{__version__}[/bold]")
-    console.print(f"[dim]{TAGLINE}[/dim]")
-    console.print(f"[dim]{SITE}  |  {REPO_URL}[/dim]")
+    print_banner()
 
 
 @app.command()
@@ -174,7 +191,8 @@ def doctor() -> None:
     _apply_sandbox(settings)
     all_ok = True
 
-    console.print(Panel.fit("[bold]HexSwarm doctor[/bold]", border_style="cyan"))
+    print_banner()
+    console.print("\n[bold underline]Readiness check[/bold underline]")
 
     # --- Model check ---
     console.print(f"\n[bold]Model[/bold]: {settings.primary_model}")
@@ -228,11 +246,17 @@ RISK_LEVEL_COLOR = {
 @app.command(name="tools")
 def list_tools() -> None:
     """List every registered tool, its category, risk tier, and whether its binary is installed."""
-    table = Table(title="HexSwarm tool registry")
-    table.add_column("Name")
+    table = Table(
+        title="[bold bright_cyan]HexSwarm tool registry[/bold bright_cyan]",
+        box=box.ROUNDED,
+        border_style="cyan",
+        header_style="bold cyan",
+        title_justify="left",
+    )
+    table.add_column("Name", style="bold")
     table.add_column("Category")
     table.add_column("Risk level")
-    table.add_column("Binary")
+    table.add_column("Binary", style="dim")
     table.add_column("Installed?")
     for tool in ToolRegistry.all().values():
         if tool.local_only:
@@ -254,11 +278,17 @@ def list_playbooks() -> None:
     """List the built-in engagement playbooks you can pass to `run --playbook`."""
     from hexswarm.playbooks import builtin_playbooks
 
-    table = Table(title="HexSwarm built-in playbooks")
-    table.add_column("Name")
+    table = Table(
+        title="[bold bright_cyan]HexSwarm built-in playbooks[/bold bright_cyan]",
+        box=box.ROUNDED,
+        border_style="cyan",
+        header_style="bold cyan",
+        title_justify="left",
+    )
+    table.add_column("Name", style="bold")
     table.add_column("Phases")
     table.add_column("Max risk")
-    table.add_column("Description")
+    table.add_column("Description", style="dim")
     for pb in builtin_playbooks().values():
         table.add_row(pb.name, " -> ".join(pb.phases), pb.max_risk_level or "(scope default)", pb.description)
     console.print(table)
@@ -433,7 +463,8 @@ def run(
 
     findings = FindingsStore(engagement_name=guard.engagement_name, persist_path=findings_out)
 
-    console.print(f"[bold]HexSwarm[/bold] running engagement '[cyan]{guard.engagement_name}[/cyan]' "
+    print_banner()
+    console.print(f"\n[bold]HexSwarm[/bold] running engagement '[cyan]{guard.engagement_name}[/cyan]' "
                   f"against '[yellow]{target}[/yellow]'...\n")
 
     def confirm_tool(tool_name: str, args: dict) -> bool:
@@ -534,7 +565,8 @@ def ctf(
     findings = FindingsStore(engagement_name=guard.engagement_name)
     agent = build_ctf_agent(router=router, model=model)
 
-    console.print(f"[bold]HexSwarm CTF agent[/bold] analyzing '[yellow]{file}[/yellow]'...\n")
+    print_banner()
+    console.print(f"\n[bold]HexSwarm CTF agent[/bold] analyzing '[yellow]{file}[/yellow]'...\n")
     with console.status("[bold cyan]Working...[/bold cyan]", spinner="dots"):
         summary = agent.run(goal=goal, target=str(file), guard=guard, findings=findings)
 
