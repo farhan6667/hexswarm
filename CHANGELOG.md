@@ -3,7 +3,7 @@
 All notable changes to HexSwarm are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [1.0.1] - 2026-10-13
 
 ### Added
 - A branded CLI banner (the HexSwarm wordmark, version, and the NexaForge / SFA line) shown at the

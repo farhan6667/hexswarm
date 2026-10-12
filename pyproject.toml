@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hexswarm"
-version = "1.0.0"
+version = "1.0.1"
 description = "A swarm-of-agents framework for AI-driven offensive security research, pentesting labs, and CTF solving."
 readme = "README.md"
 requires-python = ">=3.10"
