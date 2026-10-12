@@ -35,7 +35,7 @@ jobs:
           # Every one of these must show "yes", not "simulate mode": this is the whole
           # point of the toolchain image, and a regression here means a package the
           # Dockerfile asked apt to install silently stopped being installed.
-          for tool in nmap gobuster sqlmap hydra searchsploit whois subfinder whatweb file hashid; do
+          for tool in nmap gobuster sqlmap hydra searchsploit whois subfinder amass whatweb dalfox file hashid; do
             grep -q "$tool.*yes" tools_output.txt || { echo "::error::$tool is not reporting installed"; exit 1; }
           done
 

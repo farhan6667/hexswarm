@@ -15,7 +15,7 @@
 FROM kalilinux/kali-rolling
 
 LABEL org.opencontainers.image.source="https://github.com/farhan6667/hexswarm" \
-      org.opencontainers.image.description="HexSwarm with the real offensive-security toolchain installed (nmap, nuclei, gobuster, sqlmap, hydra, metasploit, searchsploit, whois, subfinder, whatweb, file, binutils, hashid)." \
+      org.opencontainers.image.description="HexSwarm with the real offensive-security toolchain installed (nmap, nuclei, gobuster, sqlmap, hydra, metasploit, searchsploit, whois, subfinder, amass, theHarvester, whatweb, dalfox, file, binutils, hashid)." \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.authors="Syed Farhan Ahmed (SFA), NexaForge"
 
@@ -32,7 +32,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         exploitdb \
         whois \
         subfinder \
+        amass \
+        theharvester \
         whatweb \
+        dalfox \
         binutils \
         file \
         hashid \

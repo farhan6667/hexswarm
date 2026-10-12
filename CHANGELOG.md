@@ -3,6 +3,14 @@
 All notable changes to HexSwarm are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+- The Kali-based toolchain image now also installs amass, theHarvester, and dalfox, so the new
+  subdomain_enum, osint_harvest, and xss_scan adapters run for real inside the sandbox instead of
+  dropping to simulate mode. SubOver and garak stay out of the image (a Go build and a heavy pip
+  install respectively) and still simulate there.
+
 ## [1.0.1] - 2026-10-13
 
 ### Added
