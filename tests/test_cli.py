@@ -9,7 +9,13 @@ runner = CliRunner()
 def test_version_command():
     result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
-    assert "hexswarm" in result.stdout
+    assert "hexswarm" in result.stdout.lower()
+
+
+def test_version_shows_the_brand():
+    result = runner.invoke(app, ["version"])
+    assert "NexaForge" in result.stdout
+    assert "Syed Farhan Ahmed" in result.stdout
 
 
 def test_tools_command_lists_registry():

@@ -20,9 +20,17 @@ from hexswarm.safety.guard import ScopeGuard, ScopeViolation, ToolRiskLevel
 from hexswarm.tools.base import ToolRegistry
 from hexswarm.tools.sandbox import configure_sandbox
 
+# Project identity, kept in one place so the version output and the help footer stay in sync.
+AUTHOR = "Syed Farhan Ahmed (SFA)"
+ORG = "NexaForge"
+SITE = "https://nexaforge.eu.cc"
+REPO_URL = "https://github.com/farhan6667/hexswarm"
+TAGLINE = f"An independent project by {AUTHOR} at {ORG}"
+
 app = typer.Typer(
     name="hexswarm",
     help="A swarm-of-agents framework for AI-driven offensive security research.",
+    epilog=f"{TAGLINE}  |  {SITE}",
     no_args_is_help=True,
 )
 console = Console()
@@ -47,7 +55,9 @@ MODEL_PRESETS = {
 @app.command()
 def version() -> None:
     """Print the installed HexSwarm version."""
-    console.print(f"hexswarm {__version__}")
+    console.print(f"[bold cyan]HexSwarm[/bold cyan] [bold]{__version__}[/bold]")
+    console.print(f"[dim]{TAGLINE}[/dim]")
+    console.print(f"[dim]{SITE}  |  {REPO_URL}[/dim]")
 
 
 @app.command()
