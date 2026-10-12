@@ -132,4 +132,61 @@ class PromptInjectionProbe(Tool):
         return any(marker in lowered for marker in _COMPLIANCE_MARKERS)
 
 
+class LlmScan(Tool):
+    name: ClassVar[str] = "llm_scan"
+    description: ClassVar[str] = (
+        "Runs garak, a full LLM vulnerability scanner, against a model or endpoint to probe for "
+        "jailbreaks, prompt injection, training-data leakage, toxicity, and more. This is a thin "
+        "pass-through to garak: 'target' is the model name it loads, 'model_type' its generator "
+        "(default 'rest' for an HTTP endpoint, with a 'config' file for the REST details), and "
+        "'probes' which probe families to run. Deeper than prompt_injection_probe, which is a "
+        "fixed heuristic battery, but it needs garak installed on the host."
+    )
+    binary: ClassVar[str] = "garak"
+    risk_level: ClassVar[ToolRiskLevel] = ToolRiskLevel.INTRUSIVE
+    category: ClassVar[str] = "ai-security"
+    # garak's 'target' is a model name or a generator config, not a scannable network host, so it
+    # can't match the host-based scope allow list. It still clears the risk gate.
+    requires_scope_check: ClassVar[bool] = False
+    timeout_seconds: ClassVar[int] = 1800
+    parameters_schema: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "target": {
+                "type": "string",
+                "description": "Model name garak should load, e.g. 'gpt-4o-mini', or a REST config label.",
+            },
+            "model_type": {
+                "type": "string",
+                "description": "garak generator type. Defaults to 'rest' for an HTTP endpoint.",
+            },
+            "config": {
+                "type": "string",
+                "description": "Optional path to a garak REST generator JSON config for an HTTP endpoint.",
+            },
+            "probes": {
+                "type": "string",
+                "description": "Comma-separated probe families. Defaults to a focused injection/leak set.",
+            },
+            "generations": {
+                "type": "integer",
+                "description": "Attempts per probe. Defaults to 5.",
+            },
+        },
+        "required": ["target"],
+    }
+
+    def build_command(self, **kwargs: Any) -> list[str]:
+        model_type = kwargs.get("model_type") or "rest"
+        probes = kwargs.get("probes") or "promptinject,leakreplay"
+        generations = kwargs.get("generations") or 5
+        cmd = [self.binary, "--model_type", model_type, "--model_name", kwargs["target"]]
+        config = kwargs.get("config")
+        if config:
+            cmd += ["-G", config]
+        cmd += ["--probes", probes, "--generations", str(generations)]
+        return cmd
+
+
 ToolRegistry.register(PromptInjectionProbe())
+ToolRegistry.register(LlmScan())

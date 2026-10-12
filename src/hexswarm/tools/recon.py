@@ -139,6 +139,84 @@ class DnsResolve(Tool):
         return [self.binary, "-d", kwargs["target"], "-silent", "-a", "-resp"]
 
 
+class SubdomainEnum(Tool):
+    name: ClassVar[str] = "subdomain_enum"
+    description: ClassVar[str] = (
+        "Passive subdomain and attack-surface enumeration for a root domain using OWASP Amass. "
+        "Pulls from certificate transparency, passive DNS, and other open sources without actively "
+        "probing the target, so it stays read-only recon. Feed the results into http_probe or "
+        "dns_resolve to find the ones that are actually live."
+    )
+    binary: ClassVar[str] = "amass"
+    risk_level: ClassVar[ToolRiskLevel] = ToolRiskLevel.READ_ONLY
+    timeout_seconds: ClassVar[int] = 300
+    parameters_schema: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "target": {"type": "string", "description": "Root domain, e.g. example.com"},
+        },
+        "required": ["target"],
+    }
+
+    def build_command(self, **kwargs: Any) -> list[str]:
+        return [self.binary, "enum", "-passive", "-d", kwargs["target"]]
+
+
+class OsintHarvest(Tool):
+    name: ClassVar[str] = "osint_harvest"
+    description: ClassVar[str] = (
+        "Passive OSINT collection for a domain using theHarvester: email addresses, employee "
+        "names, subdomains, and hosts pulled from public search engines and data sources. "
+        "Read-only, it queries third-party sources rather than the target itself."
+    )
+    binary: ClassVar[str] = "theHarvester"
+    risk_level: ClassVar[ToolRiskLevel] = ToolRiskLevel.READ_ONLY
+    timeout_seconds: ClassVar[int] = 300
+    parameters_schema: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "target": {"type": "string", "description": "Root domain, e.g. example.com"},
+            "sources": {
+                "type": "string",
+                "description": "Comma-separated theHarvester sources. Defaults to a fast, key-free set.",
+            },
+        },
+        "required": ["target"],
+    }
+
+    def build_command(self, **kwargs: Any) -> list[str]:
+        sources = kwargs.get("sources") or "crtsh,duckduckgo,bing,otx"
+        return [self.binary, "-d", kwargs["target"], "-b", sources]
+
+
+class SubdomainTakeover(Tool):
+    name: ClassVar[str] = "subdomain_takeover"
+    description: ClassVar[str] = (
+        "Checks a list of subdomains for dangling DNS records that can be taken over (unclaimed "
+        "cloud services, dropped CNAME targets) using SubOver. Pass an operator-staged file of "
+        "subdomains, one per line, typically the output of subdomain_enum."
+    )
+    binary: ClassVar[str] = "SubOver"
+    risk_level: ClassVar[ToolRiskLevel] = ToolRiskLevel.ACTIVE_RECON
+    # 'target' here is a path to a staged subdomain-list file, not a network host, so it can't
+    # satisfy the host/CIDR/domain scope matcher. It still clears the risk gate.
+    requires_scope_check: ClassVar[bool] = False
+    timeout_seconds: ClassVar[int] = 300
+    parameters_schema: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "target": {
+                "type": "string",
+                "description": "Path to a file of subdomains to check, one per line.",
+            },
+        },
+        "required": ["target"],
+    }
+
+    def build_command(self, **kwargs: Any) -> list[str]:
+        return [self.binary, "-l", kwargs["target"]]
+
+
 ToolRegistry.register(WhoisLookup())
 ToolRegistry.register(DnsEnum())
 ToolRegistry.register(PortScan())
@@ -147,3 +225,6 @@ ToolRegistry.register(HttpProbe())
 ToolRegistry.register(FastPortScan())
 ToolRegistry.register(WebCrawl())
 ToolRegistry.register(DnsResolve())
+ToolRegistry.register(SubdomainEnum())
+ToolRegistry.register(OsintHarvest())
+ToolRegistry.register(SubdomainTakeover())

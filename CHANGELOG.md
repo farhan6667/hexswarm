@@ -5,6 +5,15 @@ All notable changes to HexSwarm are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+- Five new tool adapters wrapping well-known open-source scanners, each scope-gated and risk-tiered
+  like the rest: `subdomain_enum` (OWASP Amass, passive subdomain and attack-surface enumeration),
+  `osint_harvest` (theHarvester, passive email/name/host OSINT), `subdomain_takeover` (SubOver,
+  dangling-DNS takeover checks over a staged subdomain list), `xss_scan` (dalfox, focused XSS and
+  parameter analysis), and `llm_scan` (garak, a full LLM vulnerability scanner for the ai-security
+  track, deeper than the built-in prompt_injection_probe). Each wraps the tool's own CLI; nothing is
+  vendored, so a missing binary just drops to simulate mode as usual.
+
 ### Fixed
 - Compliance mapping routing. Two keyword collisions surfaced by validation are fixed: a
   scanner naming "rce" in its output no longer routes to the exploitation-foothold control

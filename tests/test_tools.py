@@ -37,6 +37,50 @@ def test_projectdiscovery_tools_build_commands():
     assert TR.get("dns_resolve").build_command(target="example.com")[0] == "dnsx"
 
 
+def test_registry_contains_adopted_tools():
+    names = ToolRegistry.all()
+    for expected in ["subdomain_enum", "osint_harvest", "subdomain_takeover", "xss_scan", "llm_scan"]:
+        assert expected in names
+
+
+def test_adopted_tools_build_commands():
+    reg = ToolRegistry
+    assert reg.get("subdomain_enum").build_command(target="example.com") == [
+        "amass", "enum", "-passive", "-d", "example.com",
+    ]
+    assert reg.get("osint_harvest").build_command(target="example.com")[:3] == [
+        "theHarvester", "-d", "example.com",
+    ]
+    assert reg.get("subdomain_takeover").build_command(target="subs.txt") == [
+        "SubOver", "-l", "subs.txt",
+    ]
+    assert reg.get("xss_scan").build_command(target="http://x/?q=1")[:3] == [
+        "dalfox", "url", "http://x/?q=1",
+    ]
+    llm = reg.get("llm_scan").build_command(target="gpt-4o-mini")
+    assert llm[0] == "garak" and "--model_name" in llm and "gpt-4o-mini" in llm
+
+
+def test_llm_scan_is_ai_security_and_skips_host_scope():
+    tool = ToolRegistry.get("llm_scan")
+    assert tool.category == "ai-security"
+    # Its target is a model name, not a network host, so it must not go through host scope matching.
+    assert tool.requires_scope_check is False
+
+
+def test_subdomain_takeover_skips_host_scope():
+    # Its target is a staged file path, not a host, so host scope matching is bypassed.
+    assert ToolRegistry.get("subdomain_takeover").requires_scope_check is False
+
+
+def test_adopted_tool_simulates_when_binary_missing(monkeypatch):
+    tool = ToolRegistry.get("subdomain_enum")
+    monkeypatch.setattr(tool, "is_available", lambda: False)
+    result = tool.run(guard(), target="scanme.nmap.org")
+    assert result.simulated is True
+    assert "amass" in result.output
+
+
 def test_port_scan_builds_expected_command():
     tool = PortScan()
     cmd = tool.build_command(target="scanme.nmap.org", ports="22,80")

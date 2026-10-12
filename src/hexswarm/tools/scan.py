@@ -96,7 +96,23 @@ class PasswordBruteForce(Tool):
         ]
 
 
+class XssScan(Tool):
+    name: ClassVar[str] = "xss_scan"
+    description: ClassVar[str] = (
+        "Scans a URL for cross-site scripting and analyses its parameters using dalfox. More "
+        "focused than the generic nuclei pass: it fuzzes parameters, verifies reflections, and "
+        "detects and bypasses common WAFs. Intrusive, it sends payloads to the target."
+    )
+    binary: ClassVar[str] = "dalfox"
+    risk_level: ClassVar[ToolRiskLevel] = ToolRiskLevel.INTRUSIVE
+    timeout_seconds: ClassVar[int] = 600
+
+    def build_command(self, **kwargs: Any) -> list[str]:
+        return [self.binary, "url", kwargs["target"], "--silence", "--no-color"]
+
+
 ToolRegistry.register(WebVulnScan())
 ToolRegistry.register(DirectoryBrute())
 ToolRegistry.register(SqlInjectionScan())
 ToolRegistry.register(PasswordBruteForce())
+ToolRegistry.register(XssScan())

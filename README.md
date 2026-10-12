@@ -29,7 +29,7 @@ high-level goal like "find a web server on this target and check for common vuln
 | **Exports** | Markdown report, SARIF (GitHub Security tab), and structured JSON |
 | **Onboards with** | `hexswarm init` (guided setup), `hexswarm doctor` (readiness check), playbooks, and bundled `lab` targets for safe end-to-end testing |
 | **Never fakes** | A missing tool binary runs in clearly labeled simulate mode instead of crashing or silently skipping |
-| **Status** | Stable (1.0). 188 automated tests, ruff/mypy/bandit clean; validated end to end in CI against a live OWASP Juice Shop lab |
+| **Status** | Stable (1.0). 197 automated tests, ruff/mypy/bandit clean; validated end to end in CI against a live OWASP Juice Shop lab |
 
 ## How it fits together
 
@@ -262,8 +262,9 @@ It checks that your configured model is actually reachable (starts Ollama? has a
 tools are installed on this machine, so you find out about a missing piece before a 20-minute engagement run does.
 
 HexSwarm itself has no heavy dependencies, it's a thin orchestration layer. The underlying security tools (`nmap`, `nuclei`, `gobuster`,
-`sqlmap`, `hydra`, `searchsploit`, Metasploit, plus `file`/`strings`/`binwalk`/`hashid` for CTF mode) are expected to live on a proper pentest
-host (Kali, a security-focused Linux box, or WSL). If a binary isn't present, the matching tool runs in simulate mode automatically, so the
+`sqlmap`, `hydra`, `searchsploit`, Metasploit, the ProjectDiscovery stack `httpx`/`naabu`/`katana`/`dnsx`/`subfinder`, plus `amass`,
+`theHarvester`, `SubOver`, `dalfox`, and `garak` for LLM testing, and `file`/`strings`/`binwalk`/`hashid` for CTF mode) are expected to live
+on a proper pentest host (Kali, a security-focused Linux box, or WSL). If a binary isn't present, the matching tool runs in simulate mode automatically, so the
 framework and its test suite work anywhere Python runs.
 
 Prefer a container to a bare host? `docker build -t hexswarm .` gives HexSwarm an isolated place to run. The default image doesn't bundle the
