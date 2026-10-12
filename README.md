@@ -270,6 +270,20 @@ Prefer a container to a bare host? `docker build -t hexswarm .` gives HexSwarm a
 pentest toolchain (see the comment at the top of the [Dockerfile](Dockerfile) for how to layer it on top of a Kali base image), so out of the
 box it runs the same way a plain dev machine does: real logic, simulated tool output.
 
+You don't have to build it yourself. Every release publishes a ready-made image to the GitHub Container Registry, and GitHub serves the
+download, so pulling it puts no load on this project's own hosting:
+
+```bash
+# the app image (the thin orchestration layer)
+docker pull ghcr.io/farhan6667/hexswarm:latest        # or a pinned tag like :1.0.0
+docker run --rm ghcr.io/farhan6667/hexswarm:latest --help
+
+# the Kali-based toolchain image, with the real pentest tools already installed
+docker pull ghcr.io/farhan6667/hexswarm-toolchain:latest
+```
+
+Both packages are listed under the repository's [Packages](https://github.com/farhan6667/hexswarm/pkgs/container/hexswarm) and are free to pull.
+
 ## Configure a model
 
 Copy `.env.example` to `.env` and set one model string:
