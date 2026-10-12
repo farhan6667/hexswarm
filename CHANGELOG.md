@@ -3,6 +3,16 @@
 All notable changes to HexSwarm are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+- Compliance mapping routing. Two keyword collisions surfaced by validation are fixed: a
+  scanner naming "rce" in its output no longer routes to the exploitation-foothold control
+  set (the foothold and privilege-escalation rules are now pinned to the exploit and privesc
+  phases, so a scan-phase detection maps to the vulnerability rules instead), and the generic
+  word "flagged" no longer pulls a finding into the AI prompt-injection rule. Added a
+  `match_phases` gate to the rule engine and regression tests for both cases.
+
 ## [1.0.0] - 2026-10-11
 
 First stable release. The alpha label is dropped because the pipeline is now validated

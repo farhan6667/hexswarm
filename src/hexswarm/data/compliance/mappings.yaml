@@ -58,20 +58,28 @@ rules:
   - id: exploitation-foothold
     match_tools: ["metasploit_module_run"]
     match_keywords: ["shell", "remote code execution", "rce", "foothold", "exploited", "reverse shell"]
+    # Exploit phase only: a scanner naming "rce" in its output has DETECTED a vulnerability,
+    # not ACHIEVED a foothold. Those scan-phase findings belong to the vulnerability rules, so
+    # this rule is pinned to the exploit phase where a foothold is actually proven.
+    match_phases: ["exploit"]
     iso27001: ["A.8.8 Management of technical vulnerabilities", "A.8.7 Protection against malware"]
     pci_dss: ["6.3 Security vulnerabilities addressed", "11.4.1 External and internal penetration testing"]
-    rationale: "A proven exploitation path demonstrates an exploitable vulnerability the vulnerability-management and pentest requirements expect to be found and fixed."
+    rationale: "A proven exploitation path (exploit phase) demonstrates an exploitable vulnerability the vulnerability-management and pentest requirements expect to be found and fixed."
 
   - id: privilege-escalation
     match_tools: ["linux_privesc_enum", "windows_privesc_enum"]
     match_keywords: ["privilege escalation", "suid", "misconfigured service", "writable", "unquoted path", "stored credential", "alwaysinstallelevated"]
+    # Privesc phase only, for the same reason as the foothold rule: these are post-access
+    # findings, so a word like "writable" showing up in a recon or scan result should not
+    # route here.
+    match_phases: ["privesc"]
     iso27001: ["A.8.2 Privileged access rights", "A.8.9 Configuration management"]
     pci_dss: ["7.2 Access to system components restricted", "2.2 Secure system configuration"]
     rationale: "Local privilege-escalation vectors map to privileged-access and secure-configuration controls."
 
   - id: prompt-injection-ai-app
     match_tools: ["prompt_injection_probe"]
-    match_keywords: ["prompt injection", "system prompt", "jailbreak", "flagged"]
+    match_keywords: ["prompt injection", "system prompt", "jailbreak"]
     iso27001: ["A.8.26 Application security requirements", "A.8.28 Secure coding"]
     pci_dss: ["6.2 Bespoke and custom software developed securely"]
     rationale: "Prompt-injection weaknesses in an AI-backed application are an application-security concern; note PCI DSS has no AI-specific requirement, this is the closest existing control area."

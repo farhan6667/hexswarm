@@ -53,6 +53,52 @@ def test_exposed_network_service_does_not_fall_into_the_web_rule():
     assert any("A.8.21" in c for c in mapped[0].iso27001)
 
 
+def test_scanner_detecting_rce_is_not_treated_as_a_foothold():
+    # A scan-phase nuclei finding whose output names "rce" has DETECTED a vulnerability, not
+    # achieved a foothold. It must route to a vulnerability rule, never exploitation-foothold.
+    s = store_with(
+        Finding(
+            phase="scan",
+            tool_name="web_vuln_scan",
+            target="http://x",
+            summary="nuclei matched a template tagged rce on the target",
+        )
+    )
+    mapped, _ = map_findings(s)
+    assert mapped[0].rule_id != "exploitation-foothold"
+    assert mapped[0].rule_id == "web-vulnerability"
+
+
+def test_generic_flagged_wording_does_not_match_the_ai_rule():
+    # "flagged" is ordinary scanner English; it must not pull a web finding into the
+    # prompt-injection rule. That rule stays pinned to AI-specific wording and its own tool.
+    s = store_with(
+        Finding(
+            phase="scan",
+            tool_name="web_vuln_scan",
+            target="http://x",
+            summary="scanner flagged a suspicious response",
+        )
+    )
+    mapped, _ = map_findings(s)
+    assert mapped[0].rule_id != "prompt-injection-ai-app"
+
+
+def test_real_exploit_phase_foothold_still_maps_to_foothold():
+    # The phase gate must not break the real case: an exploit-phase foothold still maps.
+    s = store_with(
+        Finding(
+            phase="exploit",
+            tool_name="metasploit_module_run",
+            target="10.0.0.5",
+            summary="got a reverse shell on the target",
+        )
+    )
+    mapped, _ = map_findings(s)
+    assert mapped[0].rule_id == "exploitation-foothold"
+    assert any("11.4.1" in c for c in mapped[0].pci_dss)
+
+
 def test_unmatched_finding_is_unmapped_not_compliant():
     s = store_with(Finding(phase="recon", tool_name="whois_lookup", target="x", summary="registrar info"))
     mapped, unmapped = map_findings(s)

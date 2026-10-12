@@ -37,6 +37,7 @@ class MappingRule:
     id: str
     match_tools: list[str] = field(default_factory=list)
     match_keywords: list[str] = field(default_factory=list)
+    match_phases: list[str] = field(default_factory=list)
     iso27001: list[str] = field(default_factory=list)
     pci_dss: list[str] = field(default_factory=list)
     rationale: str = ""
@@ -46,7 +47,15 @@ class MappingRule:
 
         A keyword match is more specific than a broad tool match (several rules can list
         the same tool), so it scores higher and wins when rules compete for one finding.
+
+        `match_phases`, when set, is a hard gate: the rule only applies to findings from
+        those engagement phases, whatever the keywords say. A scanner naming "rce" in its
+        output is a vulnerability it detected, not a foothold it achieved, so the
+        post-access rules (foothold, privesc) are pinned to the exploit/privesc phases and
+        a scan-phase finding falls through to the vulnerability rules instead.
         """
+        if self.match_phases and finding.phase not in self.match_phases:
+            return 0
         text = f"{finding.summary} {finding.raw_output}".lower()
         if any(kw.lower() in text for kw in self.match_keywords):
             return 2
@@ -77,6 +86,7 @@ def load_rules(path: str | Path | None = None) -> list[MappingRule]:
             id=r["id"],
             match_tools=list(r.get("match_tools", [])),
             match_keywords=list(r.get("match_keywords", [])),
+            match_phases=list(r.get("match_phases", [])),
             iso27001=list(r.get("iso27001", [])),
             pci_dss=list(r.get("pci_dss", [])),
             rationale=r.get("rationale", ""),
