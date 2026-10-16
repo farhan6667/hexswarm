@@ -10,6 +10,13 @@
 
 **HexSwarm is an open source Python framework for running AI agents against authorized penetration testing, bug bounty, and CTF targets.** Independent project by Syed Farhan Ahmed (SFA) at NexaForge. It wraps publicly available security tools (nmap, Nuclei, gobuster, sqlmap, Hydra, Metasploit, searchsploit, and others) via their own CLIs; it is not affiliated with, sponsored by, or endorsed by any of their maintainers or vendors.
 
+<p align="center">
+  <a href="https://opencollective.com/nexaforge-oss"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/sponsor-button-dark.webp">
+    <img src="docs/img/sponsor-button-light.webp" width="480" alt="Support NexaForge: an animated gold Support button that opens the sponsor page">
+  </picture></a>
+</p>
+
 It connects to OpenAI, Anthropic, local Ollama models, or 100+ other providers through one interface, and gives those agents a scoped,
 safety-gated library of real offensive-security tools (recon, vulnerability scanning, exploitation, and privilege escalation), so a single
 high-level goal like "find a web server on this target and check for common vulnerabilities" turns into a coordinated, auditable swarm run.
