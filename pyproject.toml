@@ -35,7 +35,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     # Pinned below 2.x: v2 renamed FastMCP to MCPServer and reworked the low-level API.
     # v1's FastMCP is what HexSwarm's dynamic per-tool schema generation is built against.
-    "mcp>=1.2.0,<2",
+    "mcp>=1.2.0,<3",
     "requests>=2.31.0",
 ]
 
