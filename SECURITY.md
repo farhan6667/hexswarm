@@ -72,8 +72,41 @@ Honest gaps in what's enforced today, not fixed by this review, stated instead o
 - **Overly broad scope entries are trusted as written.** `ScopeGuard`'s own docstring says the scope file is
   "the single source of truth": an operator who writes `0.0.0.0/0` into `allow` gets exactly that. Nothing
   here second-guesses a CIDR the operator chose on purpose. (A specific claim that a narrower entry like
-  `10.10.10.*` could be read as `0.0.0.0/0` was checked and did not reproduce: an octet-style wildcard
-  pattern only ever matches hosts under that same prefix.)
+  `10.10.10.*` could be read as `0.0.0.0/0` was checked and did not reproduce.)
+- **~~An octet-style wildcard pattern only ever matches hosts under that same prefix~~ — this line was wrong
+  and has been removed.** An independent adversarial review found that `10.10.10.*` (and any allow/deny
+  pattern ending in an unanchored `*`) matched `10.10.10.evil.com`, not just hosts under `10.10.10.`: the
+  glob engine treated `*` as "any characters, including more dots," so nothing stopped it from absorbing an
+  entirely different, attacker-chosen domain tacked onto the end. Fixed by matching per dot-label instead of
+  via unrestricted globbing (`ScopeGuard._label_glob_match`): a bare `*` now matches exactly one label,
+  except as the pattern's first label, which keeps the conventional `*.example.com` "one or more leading
+  labels" meaning. See `tests/test_scope_guard.py` for the regression tests.
+- **Two CLI fields consumed as trailing positionals, not an option's own argument, could carry an injected
+  flag.** `password_brute_force`'s `service` is hydra's final bare argument; a value like `-o/tmp/out` was
+  read by hydra as its own `-o` option, not as a service name. Fixed with the same `reject_leading_dash`
+  check used elsewhere. `port_scan`'s `ports` and `osint_harvest`'s `sources` are lower risk (each is already
+  consumed as the argument to `-p`/`-b`), but are now restricted to the character set a real value can
+  contain (so an injected flag can't ride along inside what's supposed to be a plain value either), rather
+  than relying on "it's probably fine because of argv position."
+- **`metasploit_module_run`'s `extra_options` guard only matched `set RHOSTS`, not `setg` (global set) or any
+  other resource-script command.** A `setg RHOSTS <host>` line combined with a fresh `use` line could
+  re-target a module after the scope-checked `target` had already set it locally. `extra_options` is now an
+  allowlist: every line must be a plain local `set KEY VALUE` (never `setg`, never `use`/`run`/`exploit`/
+  anything else), and RHOST/RHOSTS is still rejected specifically within that.
+- **The scope guard's host extraction and the wrapped binaries' own URL/host parsers can disagree** on an
+  unusual string (backslash-as-slash, a stray percent-encoded byte in a hostname). Checked against this
+  project's actual toolset (nuclei/httpx/katana/dnsx/dalfox are Go `net/url`, which doesn't treat `\` as `/`
+  or percent-decode a hostname the way some other parsers do) and no live divergence was found, but this is
+  a parser-differential class that depends on exactly which binary is wrapped, not something this project
+  can close in general. Not fixed; stated here as a limit to keep in mind if a future tool wraps a binary
+  with a more permissive URL parser.
+- **A file whose contents are scope-checked (`subdomain_takeover`'s subdomain list, `llm_scan`'s REST config)
+  is checked, then re-read by the external binary it's handed to**, not re-read atomically or passed as
+  already-validated bytes. A local attacker who can race the file between the check and the binary's own
+  read (or point the path at something whose content differs per read, like a named pipe) could still get a
+  different host scanned than the one the check saw. Requires local file-system access inside the working
+  directory already, so the working-directory confinement is still the primary control; not hardened further
+  here.
 - **Tool output is not currently labeled as untrusted data when it reaches the model.** A hostile target
   could try prompt injection through whatever text a scanner returns, aiming at the agent's next tool
   choice. What already holds regardless: every tool call, however the agent decided to make it, still goes

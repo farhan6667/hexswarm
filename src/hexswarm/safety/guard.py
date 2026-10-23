@@ -8,7 +8,6 @@ on even in fully-autonomous mode.
 """
 from __future__ import annotations
 
-import fnmatch
 import ipaddress
 from dataclasses import dataclass, field
 from enum import Enum
@@ -120,6 +119,46 @@ class ScopeGuard:
             return None
         return host.rstrip(".")
 
+    @staticmethod
+    def _label_glob_match(pattern: str, host: str) -> bool:
+        """Matches `host` against a dot-label glob, where '*' stands for exactly one label.
+
+        Found by an adversarial review: `fnmatch` treats '*' as "any characters at all",
+        including dots, so a pattern like '10.10.10.*' (written to mean "any value in this
+        last octet") also matched '10.10.10.evil.com': the trailing '*' simply absorbed the
+        extra '.evil.com' with nothing anchoring it. SECURITY.md used to claim the opposite
+        ("an octet-style wildcard pattern only ever matches hosts under that same prefix"),
+        which was false and has been corrected.
+
+        Rules, applied per dot-separated label:
+        - A literal label must match the corresponding target label exactly (case-insensitive).
+        - A label that is exactly '*' matches exactly one target label, UNLESS it is the
+          pattern's first label, in which case it matches one or more leading target labels
+          (the conventional '*.example.com' subdomain-wildcard meaning).
+        - A label containing '*' mixed with other characters (e.g. 'host-*') is not
+          supported; it never matches anything (fail closed, rather than silently falling
+          back to an unanchored match).
+        - Total label count must line up exactly everywhere except where the leading '*'
+          absorbed extra labels, so nothing can be appended after the pattern's real
+          right-hand boundary the way it previously could.
+        """
+        pattern_labels = pattern.split(".")
+        host_labels = host.split(".")
+        if any(label != "*" and "*" in label for label in pattern_labels):
+            return False
+        if pattern_labels and pattern_labels[0] == "*":
+            fixed = pattern_labels[1:]
+            if len(host_labels) < len(fixed) + 1:
+                return False
+            tail = host_labels[len(host_labels) - len(fixed):]
+            consumed_leading = host_labels[:len(host_labels) - len(fixed)]
+            if not consumed_leading:
+                return False
+            return all(f == "*" or f == t for f, t in zip(fixed, tail))
+        if len(pattern_labels) != len(host_labels):
+            return False
+        return all(p == "*" or p == h for p, h in zip(pattern_labels, host_labels))
+
     def _matches(self, pattern: str, raw_target: str) -> bool:
         pattern = pattern.strip()
         target = self._extract_host(raw_target)
@@ -135,8 +174,9 @@ class ScopeGuard:
                 return False
         except ValueError:
             pass
-        # Glob match for hostnames/domains, e.g. *.example.com
-        return fnmatch.fnmatch(target.lower(), pattern.lower())
+        # Dot-label glob match for hostnames/domains/octet patterns, e.g. *.example.com or
+        # 10.10.10.*. Not fnmatch: see _label_glob_match for why.
+        return self._label_glob_match(pattern.lower(), target.lower())
 
     def check_target(self, target: str) -> None:
         """Raise ScopeViolation if target is not explicitly authorized."""

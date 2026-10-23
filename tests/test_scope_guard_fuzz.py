@@ -25,8 +25,33 @@ IN_SCOPE_HOST = "app.lab.local"
 OUT_OF_SCOPE_HOST = "evil.other.com"
 
 
+def _is_independently_in_scope(host: str) -> bool:
+    """Re-implements what 'in scope' means for guard()'s allow list, independently of
+    ScopeGuard's own matching code, so asserting against it is a real check and not a
+    tautology (calling back into the same function being tested would always pass)."""
+    import ipaddress as _ip
+
+    if host.lower().endswith(".lab.local"):
+        return True
+    try:
+        if _ip.ip_address(host) in _ip.ip_network("10.10.10.0/24"):
+            return True
+    except ValueError:
+        pass
+    labels = host.lower().split(".")
+    return len(labels) == 4 and labels[0] == "10" and labels[1] == "10" and labels[2] == "11"
+
+
 def guard():
-    return ScopeGuard(engagement_name="t", allow=["*.lab.local", "10.10.10.0/24"], max_risk_level=ToolRiskLevel.POST_EXPLOIT)
+    # Includes a trailing-octet-wildcard entry (10.10.11.*), not just a CIDR: a prior version
+    # of this fuzzer used only '*.lab.local' and '10.10.10.0/24', so it could never generate
+    # the one shape (10.10.11.evil.com against 10.10.11.*) that broke the real bypass an
+    # independent adversarial review later found. See test_security_hardening.py.
+    return ScopeGuard(
+        engagement_name="t",
+        allow=["*.lab.local", "10.10.10.0/24", "10.10.11.*"],
+        max_risk_level=ToolRiskLevel.POST_EXPLOIT,
+    )
 
 
 # Printable ASCII plus a slice of Unicode (IDNA-relevant script, RTL override, lookalike
@@ -58,7 +83,7 @@ def test_fuzz_cannot_make_an_out_of_scope_host_pass_by_decorating_it(prefix, suf
     # in-scope URL around some literal text that merely contains "evil.other.com", such as
     # inside a query string on an in-scope host). Confirm that's really what happened.
     host = ScopeGuard._extract_host(candidate)
-    assert host is not None and (host.endswith(".lab.local") or host.startswith("10.10.10.")), (
+    assert host is not None and _is_independently_in_scope(host), (
         f"{candidate!r} was accepted as in scope, but its extracted host was {host!r}"
     )
 

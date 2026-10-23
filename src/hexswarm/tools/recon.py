@@ -1,6 +1,7 @@
 """Read-only and active-recon tools: information gathering before anything touches a target hard."""
 from __future__ import annotations
 
+import re
 from typing import Any, ClassVar
 
 from hexswarm.safety.guard import ScopeGuard, ScopeViolation, ToolRiskLevel
@@ -60,10 +61,19 @@ class PortScan(Tool):
         "required": ["target"],
     }
 
+    # nmap's own "-p-" syntax (all 65535 ports) is a literal '-' as -p's argument, so unlike
+    # most fields here, a value that merely starts with '-' isn't automatically invalid.
+    # Instead of rejecting on that one character, this restricts the whole value to what a
+    # real port spec can contain (digits, commas, dashes, or exactly '-' for all ports),
+    # which rejects an injected flag like '-sS' or '-oN/path' just as effectively.
+    _PORTS_RE = re.compile(r"^-$|^[0-9][0-9,\-]*$")
+
     def build_command(self, **kwargs: Any) -> list[str]:
         ports = kwargs.get("ports", "")
         cmd = [self.binary, "-sV", "-T4", "--open"]
         if ports and ports != "top-1000":
+            if not self._PORTS_RE.match(ports):
+                raise ValueError(f"ports must be digits/commas/dashes (or '-' for all ports); got {ports!r}.")
             cmd += ["-p", ports]
         cmd.append(kwargs["target"])
         return cmd
@@ -185,8 +195,14 @@ class OsintHarvest(Tool):
         "required": ["target"],
     }
 
+    _SOURCES_RE = re.compile(r"^[A-Za-z0-9_]+(,[A-Za-z0-9_]+)*$")
+
     def build_command(self, **kwargs: Any) -> list[str]:
         sources = kwargs.get("sources") or "crtsh,duckduckgo,bing,otx"
+        # Source names are plain words; restricting the character set (rather than only
+        # rejecting a leading '-') closes a flag injected via -b's own argument too.
+        if not self._SOURCES_RE.match(sources):
+            raise ValueError(f"sources must be comma-separated plain names; got {sources!r}.")
         return [self.binary, "-d", kwargs["target"], "-b", sources]
 
 
