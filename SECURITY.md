@@ -55,6 +55,15 @@ version or, better, rebuild the venv/image from scratch. Rotate every credential
 (cloud IAM/instance role, API keys, `DATABASE_URL`, any secret in a process environment on that machine).
 Uninstalling the package alone does not remove the startup files or stop anything already running.
 
+**A second, smaller dependency gap found by `pip-audit` itself (2026-10-23/24):** `filelock` 3.32.7, pulled in
+transitively by `litellm`, has three known vulnerabilities (CVE-2026-112907, CVE-2026-112913, CVE-2026-112940),
+fixed in `filelock` 4.2.1. `litellm` 1.106.2 (the version pinned above) requires `filelock>=3.16.1,<4.0`, and
+there is no fixed 3.x `filelock` release, so no single version currently satisfies both "the litellm version
+this incident forced us onto" and "patched against these three CVEs." These three CVE IDs are explicitly
+ignored in `pip-audit`'s CI and nightly runs, with a comment pointing back here, rather than silently
+suppressing the whole scan or leaving CI permanently red for a conflict nobody can resolve by editing
+`pyproject.toml`. Revisit (and remove the ignores) once `litellm` raises or drops its `filelock` ceiling.
+
 ## Known limits
 
 Honest gaps in what's enforced today, not fixed by this review, stated instead of implied away:

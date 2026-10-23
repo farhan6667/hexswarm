@@ -26,4 +26,11 @@ jobs:
       - name: Dependency vulnerability scan (pip-audit)
         run: |
           pip install pip-audit
-          pip-audit --skip-editable
+          # Same three documented, currently-unresolvable ignores as ci.yml (a litellm
+          # 1.106.2 ceiling vs. the filelock CVE fix both apply to filelock, with no
+          # version satisfying both) — kept here too so this job alerts on anything NEW,
+          # not on the same known gap every single night. See SECURITY.md "Known limits".
+          pip-audit --skip-editable \
+            --ignore-vuln CVE-2026-112907 \
+            --ignore-vuln CVE-2026-112913 \
+            --ignore-vuln CVE-2026-112940
