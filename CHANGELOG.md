@@ -3,6 +3,61 @@
 All notable changes to HexSwarm are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.1] - 2026-10-24
+
+A same-day QA pass on 1.1.0 itself: a fresh independent adversarial review (not the outside
+reviewer; a separate review run given only the diff and a threat list) found that 1.1.0's own
+scope-matching code had a real bypass, and this release fixes it, along with three smaller
+findings from the same pass, and ships the process changes meant to catch this class of thing
+automatically from now on.
+
+### Security
+- **A real scope bypass: any allow/deny glob ending in an unanchored `*` admitted an
+  attacker-chosen suffix.** `10.10.10.*` (written to mean "any value in this one octet") also
+  matched `10.10.10.evil.com`, because the glob engine's `*` crosses dot boundaries with nothing
+  anchoring the end. SECURITY.md had actively (and wrongly) claimed the opposite. Fixed by
+  matching per dot-label instead of raw glob (`ScopeGuard._label_glob_match`): a bare `*` now
+  matches exactly one label, except as the pattern's first label, which keeps the conventional
+  `*.example.com` meaning. The previously-shipped test for this exact claim only checked that an
+  in-scope host was admitted and an unrelated one rejected; it never tried a hostname that
+  *extends* the prefix, so it passed while the bypass was open. Strengthened, and the fuzz
+  suite's allow list now includes a trailing-wildcard pattern so this shape gets exercised going
+  forward.
+- `password_brute_force`'s `service` field (a trailing positional, not consumed as another
+  option's argument) could carry an injected hydra flag; now dash-rejected like `target`/
+  `ssh_user`. `port_scan`'s `ports` and `osint_harvest`'s `sources` are lower risk (already
+  consumed as `-p`/`-b`'s own argument) but are now restricted to the character set a real value
+  can contain.
+- `metasploit_module_run`'s `extra_options` guard only blocked `set RHOSTS`, not `setg` (global
+  set) or a smuggled `use` line that re-enters module context where a global RHOSTS could still
+  apply. `extra_options` is now an allowlist: only plain local `set KEY VALUE` lines, never
+  `setg` or any other resource-script command.
+- Documented two lower-severity findings in SECURITY.md rather than fixing them this round: a
+  URL-parser differential between the scope guard and the wrapped binaries (checked against this
+  project's actual toolset, no live divergence found), and a TOCTOU gap where a scope-checked
+  file's contents are re-read by the external binary rather than passed as already-validated
+  bytes.
+- `pip-audit` correctly flagged a `filelock` CVE (pulled in transitively by `litellm`); no fix is
+  currently possible without conflicting with `litellm`'s own version ceiling, so it's
+  ignored by CVE ID with a comment explaining why, documented in SECURITY.md, not silently
+  suppressed.
+
+### Process
+- `ci.yml` now runs on every push to every branch, not just `main`/PRs: the direct cause of why
+  1.1.0's dependency-pinning mistake (see below) reached `main` at all was that it had never run
+  on its own branch first. Matrix widened to Python 3.10-3.14.
+- New `tests/test_tool_parameter_coverage.py`: every registered tool and every parameter it
+  accepts must be classified (host/host-in-file/path/ssh_user/free_text/safe); fails if a new
+  tool or parameter ships unclassified.
+- New `tests/test_scope_guard_fuzz.py`: hypothesis-based fuzz tests on the scope matcher, dash
+  rejection and path confinement.
+- New `docs/process-notes/2026-10-security-reviews-root-cause.md` and `PRE_RELEASE_CHECKLIST.md`.
+- `Dockerfile.toolchain`'s `apt-get` now retries with backoff: a flaky Kali mirror
+  (mirror.us.cdn-perfprod.com, a GeoIP redirect behind http.kali.org) caused real, reproducible
+  CI failures in the 1.1.0 toolchain-image and lab-validation workflows.
+- Fixed stale version drift: `CITATION.cff` still said 1.0.1, README's test count said 197 (now
+  246).
+
 ## [1.1.0] - 2026-10-23
 
 Two more rounds of reports from the same external reviewer, Allen Clark, thank you. The

@@ -36,7 +36,7 @@ high-level goal like "find a web server on this target and check for common vuln
 | **Exports** | Markdown report, SARIF (GitHub Security tab), and structured JSON |
 | **Onboards with** | `hexswarm init` (guided setup), `hexswarm doctor` (readiness check), playbooks, and bundled `lab` targets for safe end-to-end testing |
 | **Never fakes** | A missing tool binary runs in clearly labeled simulate mode instead of crashing or silently skipping |
-| **Status** | Stable (1.0). 239 automated tests, ruff/mypy/bandit clean; validated end to end in CI against a live OWASP Juice Shop lab; also fuzz-tested (hypothesis) against hostile input to the scope guard and path confinement |
+| **Status** | Stable (1.0). 246 automated tests, ruff/mypy/bandit clean; validated end to end in CI against a live OWASP Juice Shop lab; also fuzz-tested (hypothesis) against hostile input to the scope guard and path confinement |
 
 ## How it fits together
 
