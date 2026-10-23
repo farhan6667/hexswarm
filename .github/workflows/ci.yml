@@ -1,8 +1,11 @@
 name: CI
 
+# Runs on every push to every branch, not just main: a 2026-10-23 release broke the 3.10-3.12
+# matrix with a dependency pin generated on a different Python version, and the mistake only
+# surfaced after it reached main because CI had never run against the feature branch. See
+# docs/process-notes/2026-10-security-reviews-root-cause.md.
 on:
   push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -10,8 +13,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v7
 

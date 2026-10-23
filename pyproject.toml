@@ -25,6 +25,8 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
     # Upper-bounded after the 2026-10-21 LiteLLM supply-chain compromise: PyPI and the
@@ -48,6 +50,7 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "pytest-mock>=3.14.0",
+    "hypothesis>=6.100.0",
     "ruff>=0.6.0",
     "mypy>=1.10.0",
     # Not a direct hexswarm dependency, but CI's hosted runner images preinstall an older
