@@ -36,7 +36,7 @@ high-level goal like "find a web server on this target and check for common vuln
 | **Exports** | Markdown report, SARIF (GitHub Security tab), and structured JSON |
 | **Onboards with** | `hexswarm init` (guided setup), `hexswarm doctor` (readiness check), playbooks, and bundled `lab` targets for safe end-to-end testing |
 | **Never fakes** | A missing tool binary runs in clearly labeled simulate mode instead of crashing or silently skipping |
-| **Status** | Stable (1.0). 197 automated tests, ruff/mypy/bandit clean; validated end to end in CI against a live OWASP Juice Shop lab |
+| **Status** | Stable (1.0). 239 automated tests, ruff/mypy/bandit clean; validated end to end in CI against a live OWASP Juice Shop lab; also fuzz-tested (hypothesis) against hostile input to the scope guard and path confinement |
 
 ## How it fits together
 
@@ -355,7 +355,9 @@ can never match a host/CIDR/domain allow rule).
 ## Frequently asked questions
 
 **Is this safe to point at a random website?**
-No. HexSwarm refuses to run without an explicit scope file, and every tool call is checked against it, but that only enforces *your* intent. It
+No. HexSwarm refuses to run without an explicit scope file, and every tool call that names a network target is checked against it (a few tools,
+like CTF file analysis or a local exploit-database search, have no network target to check by design; see SECURITY.md for exactly which ones
+and why). That only enforces *your* intent. It
 doesn't make a target legal to test. Only run HexSwarm against systems you own or are explicitly authorized to test (your own lab, a CTF, a
 bug bounty program's in-scope assets, or a signed engagement).
 

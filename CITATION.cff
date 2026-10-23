@@ -4,7 +4,7 @@ title: "HexSwarm: A Swarm-of-Agents Framework for AI-Driven Offensive Security R
 authors:
   - family-names: "Ahmed"
     given-names: "Syed Farhan"
-date-released: 2026-10-13
+date-released: 2026-10-23
 url: "https://github.com/farhan6667/hexswarm"
 license: MIT
-version: 1.0.1
+version: 1.1.0
