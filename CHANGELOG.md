@@ -3,6 +3,56 @@
 All notable changes to HexSwarm are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.0] - 2026-10-23
+
+Two more rounds of reports from the same external reviewer, Allen Clark, thank you. The
+table below is what was checked, what turned out real, and what was fixed.
+
+| # | Reviewer's point | Real? | Fixed? |
+|---|---|---|---|
+| 1 | IP wildcard (`10.10.10.*`) also matches `0.0.0.0/0` | Checked, did not reproduce | No code change; see "Known limits" in SECURITY.md |
+| 2 | Some tools skip the scope gate completely (subdomain takeover, garak, exploit search, CTF tools, some MCP tools) | Partly real | `subdomain_takeover` and `llm_scan` now scope-check every host found inside their staged file/config, where the real network destinations actually live. `exploit_search` and the CTF tools were already correctly exempt by design (their "target" is a local DB query string or a local file's own bytes, never a network host); kept as-is |
+| 2b | MCP tools whose host argument is named `url` or `host` instead of `target` go unchecked | Real | `RemoteMCPTool` now checks `target`/`url`/`host`/`hostname` (configurable via a new `host_fields` map), and fails closed with a clear error if none is present on a scope-checked tool |
+| 3a | Hostnames aren't resolved, so an allowed name pointing at a denied IP gets through | Real limitation | Not implemented; stated plainly in SECURITY.md rather than silently left uncovered |
+| 3b | `prompt_injection_probe` follows redirects, which could bounce it out of scope | Real | That one `requests.post` call now passes `allow_redirects=False` |
+| 4 | Nothing stops a target (or `ssh_user`) starting with `-`, which a CLI tool could read as an option | Real | New `reject_leading_dash()` check in `Tool.run()` (every tool's `target`) and in `linux_privesc_enum` (`ssh_user`) |
+| 5 | Wordlist/userlist/passlist paths and the CTF file tools can read any local file | Real | New `hexswarm.safety.paths.confine_path()`: every such path is resolved and must stay inside a working directory (`HEXSWARM_WORK_DIR`, defaults to cwd); applied to `file_identify`, `string_extract`, `binwalk_scan`, `directory_brute`'s `wordlist`, and `password_brute_force`'s `userlist`/`passlist` |
+| 6a | The sandbox toolchain image is pulled as `:latest`, not pinned by digest | Real | Documented how to pin `HEXSWARM_SANDBOX_IMAGE` to a digest in SECURITY.md; not hardcoded here since the current digest needs the user's own verification, not a guess |
+| 6b | Defaults are host mode with no per-step confirmation | Real, but a UX decision | Not flipped: changing either default silently would break existing scripted/CI usage. Documented as a known limit; left for a maintainer decision rather than changed unilaterally |
+| 7 | Raw tool output goes straight back to the model, a hostile target could try prompt injection toward these gaps | Real, structural | What already held and still holds: every tool call still goes through the same `ScopeGuard`/`Tool.run()` gate regardless of what prompted the agent to request it, so injected text can influence what's asked for, never skip authorization for it. Labeling tool output as untrusted in the prompt/report layer itself is not done; stated as a limit |
+
+Also bundled in this release: the dependency pinning prepared for 1.0.3 below (not shipped
+separately; see the note there).
+
+### Security
+- New `hexswarm.safety.paths` module (`confine_path`) and `reject_leading_dash()` in
+  `tools/base.py`, both described in the table above.
+- `subdomain_takeover` and `llm_scan` read their staged file/config and scope-check every
+  host found inside it before running, instead of only checking `target` (a file path for
+  the former, a model-name label for the latter, neither a network host itself).
+- `RemoteMCPTool` checks `target`/`url`/`host`/`hostname` (configurable per tool via a new
+  `host_fields` map in the MCP server config), fails closed when none is present.
+- `prompt_injection_probe` disables HTTP redirects on its own request.
+- New test file `tests/test_security_hardening.py` plus additions to `tests/test_mcp_client.py`
+  for all of the above. 229 tests pass, ruff and mypy clean.
+
+## [1.0.3] - 2026-10-23 (prepared, not shipped separately; folded into 1.1.0 above)
+
+Kept as its own entry for the record, since this is the dependency-pinning work from the
+earlier LiteLLM supply-chain report, done first and then released together with 1.1.0
+rather than as its own tag. If a separate 1.0.3 tag is wanted instead, split this out.
+
+### Security
+- `litellm` bound to `>=1.106.2,<1.107` (was `>=1.50.0`, no upper bound) after the
+  2026-10-21 PyPI/Docker supply-chain compromise of `litellm` 1.107.0. See the "Supply
+  chain" section of SECURITY.md for the incident, what was checked, and what to do if you
+  installed the compromised version yourself.
+- New `constraints.txt`, pinning every resolved runtime and dev dependency. Both
+  Dockerfiles and CI now install with `pip install -c constraints.txt .`.
+- New nightly workflow `dependency-audit.yml`: re-runs `pip-audit` against the pinned set
+  on a schedule, so a dependency getting yanked or newly flagged doesn't require a push to
+  notice.
+
 ## [1.0.2] - 2026-10-23
 
 ### Security

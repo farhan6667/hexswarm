@@ -87,15 +87,21 @@ def test_decode_text_reports_when_nothing_decodes():
     assert "No printable result" in result.output
 
 
-def test_file_identify_builds_expected_command():
+def test_file_identify_builds_expected_command(tmp_path, monkeypatch):
+    monkeypatch.setenv("HEXSWARM_WORK_DIR", str(tmp_path))
+    sample = tmp_path / "challenge.bin"
+    sample.write_bytes(b"\x7fELF")
     tool = ToolRegistry.get("file_identify")
-    cmd = tool.build_command(target="/tmp/challenge.bin")
+    cmd = tool.build_command(target=str(sample))
     assert cmd[0] == "file"
-    assert "/tmp/challenge.bin" in cmd
+    assert str(sample.resolve()) in cmd
 
 
-def test_file_identify_simulates_when_binary_missing(monkeypatch):
+def test_file_identify_simulates_when_binary_missing(tmp_path, monkeypatch):
+    monkeypatch.setenv("HEXSWARM_WORK_DIR", str(tmp_path))
+    sample = tmp_path / "challenge.bin"
+    sample.write_bytes(b"\x7fELF")
     tool = ToolRegistry.get("file_identify")
     monkeypatch.setattr(tool, "is_available", lambda: False)
-    result = tool.run(guard(), target="/tmp/challenge.bin")
+    result = tool.run(guard(), target=str(sample))
     assert result.simulated is True
