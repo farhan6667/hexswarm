@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 from hexswarm.safety.guard import ToolRiskLevel
+from hexswarm.safety.paths import confine_path
 from hexswarm.tools.base import Tool, ToolRegistry
 
 
@@ -41,9 +42,16 @@ class DirectoryBrute(Tool):
         "required": ["target"],
     }
 
+    _DEFAULT_WORDLIST = "/usr/share/wordlists/dirb/common.txt"
+
     def build_command(self, **kwargs: Any) -> list[str]:
-        wordlist = kwargs.get("wordlist", "/usr/share/wordlists/dirb/common.txt")
-        return [self.binary, "dir", "-u", kwargs["target"], "-w", wordlist, "-q"]
+        wordlist = kwargs.get("wordlist")
+        # The built-in default is a fixed system path, not operator/agent input, so it isn't
+        # run through confine_path; anything actually supplied by a caller is.
+        wordlist_path = (
+            self._DEFAULT_WORDLIST if not wordlist else str(confine_path(wordlist, "wordlist"))
+        )
+        return [self.binary, "dir", "-u", kwargs["target"], "-w", wordlist_path, "-q"]
 
 
 class SqlInjectionScan(Tool):
@@ -89,8 +97,8 @@ class PasswordBruteForce(Tool):
     def build_command(self, **kwargs: Any) -> list[str]:
         return [
             self.binary,
-            "-L", kwargs["userlist"],
-            "-P", kwargs["passlist"],
+            "-L", str(confine_path(kwargs["userlist"], "userlist")),
+            "-P", str(confine_path(kwargs["passlist"], "passlist")),
             kwargs["target"],
             kwargs["service"],
         ]

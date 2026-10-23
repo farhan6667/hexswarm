@@ -18,12 +18,31 @@ meant to be read.
 """
 from __future__ import annotations
 
+import json
+import re
 from typing import Any, ClassVar
 
 import requests
 
-from hexswarm.safety.guard import ToolRiskLevel
-from hexswarm.tools.base import Tool, ToolRegistry
+from hexswarm.safety.guard import ScopeGuard, ScopeViolation, ToolRiskLevel
+from hexswarm.safety.paths import confine_path
+from hexswarm.tools.base import Tool, ToolRegistry, ToolResult
+
+_URL_RE = re.compile(r"https?://[^\s\"'<>]+")
+
+
+def _urls_in(value: Any) -> list[str]:
+    """Recursively collects every http(s) URL found in any string inside a JSON-shaped value."""
+    found: list[str] = []
+    if isinstance(value, str):
+        found.extend(_URL_RE.findall(value))
+    elif isinstance(value, dict):
+        for v in value.values():
+            found.extend(_urls_in(v))
+    elif isinstance(value, list):
+        for v in value:
+            found.extend(_urls_in(v))
+    return found
 
 # Each payload targets a different failure mode: direct instruction override,
 # role/persona hijacking, system-prompt extraction, and delimiter/markup
@@ -95,8 +114,13 @@ class PromptInjectionProbe(Tool):
         flagged = 0
         for probe_id, payload in _PROBE_PAYLOADS:
             try:
+                # The scope guard authorized `target`/`url` itself; a redirect response could
+                # point anywhere, in or out of scope, and requests follows redirects by default.
+                # Scope is enforced on the URL that was actually checked, not wherever a 3xx
+                # response says to go next, so redirects are disabled here rather than followed.
                 resp = requests.post(
-                    url, json={request_field: payload}, timeout=self.timeout_seconds
+                    url, json={request_field: payload}, timeout=self.timeout_seconds,
+                    allow_redirects=False,
                 )
                 text = self._extract_reply_text(resp, response_field)
             except requests.RequestException as exc:
@@ -176,6 +200,34 @@ class LlmScan(Tool):
         "required": ["target"],
     }
 
+    def run(self, guard: ScopeGuard, **kwargs: Any) -> ToolResult:
+        # 'target' (--model_name) is a label, not a host, which is why requires_scope_check
+        # is False above; for the 'rest' generator (the default) the actual network
+        # destination lives inside the --config JSON file instead, as a URI field garak reads.
+        # Confine the file and scope-check every URL found in it before running, the same
+        # principle as subdomain_takeover's file-content check: skipping the host-shaped
+        # 'target' check must not mean skipping scope checking altogether.
+        config = kwargs.get("config")
+        if config:
+            path = confine_path(config, "config")
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except ValueError as exc:
+                raise ValueError(f"config ({config!r}) is not valid JSON: {exc}") from None
+            out_of_scope = []
+            for url in _urls_in(data):
+                try:
+                    guard.check_target(url)
+                except ScopeViolation:
+                    out_of_scope.append(url)
+            if out_of_scope:
+                raise ScopeViolation(
+                    f"config {config!r} points garak at {len(out_of_scope)} URL(s) not covered "
+                    f"by any allow rule in scope '{guard.engagement_name}': "
+                    f"{', '.join(out_of_scope[:5])}{'...' if len(out_of_scope) > 5 else ''}."
+                )
+        return super().run(guard, **kwargs)
+
     def build_command(self, **kwargs: Any) -> list[str]:
         model_type = kwargs.get("model_type") or "rest"
         probes = kwargs.get("probes") or "promptinject,leakreplay"
@@ -183,7 +235,7 @@ class LlmScan(Tool):
         cmd = [self.binary, "--model_type", model_type, "--model_name", kwargs["target"]]
         config = kwargs.get("config")
         if config:
-            cmd += ["-G", config]
+            cmd += ["-G", str(confine_path(config, "config"))]
         cmd += ["--probes", probes, "--generations", str(generations)]
         return cmd
 

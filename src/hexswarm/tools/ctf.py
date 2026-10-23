@@ -19,6 +19,7 @@ from typing import Any, ClassVar
 from urllib.parse import unquote
 
 from hexswarm.safety.guard import ToolRiskLevel
+from hexswarm.safety.paths import confine_path
 from hexswarm.tools.base import Tool, ToolRegistry
 
 
@@ -42,7 +43,11 @@ class FileIdentify(Tool):
     }
 
     def build_command(self, **kwargs: Any) -> list[str]:
-        return [self.binary, "--brief", kwargs["target"]]
+        # 'target' here is a file path, not a network host, so the scope guard never checks
+        # it (requires_scope_check=False above): confine it to the working directory instead,
+        # so it can't be pointed at an arbitrary local file (e.g. ~/.aws/credentials) whose
+        # contents would otherwise come straight back as this tool's own output.
+        return [self.binary, "--brief", str(confine_path(kwargs["target"], "target"))]
 
 
 class StringExtract(Tool):
@@ -65,7 +70,7 @@ class StringExtract(Tool):
     }
 
     def build_command(self, **kwargs: Any) -> list[str]:
-        return [self.binary, "-n", "4", kwargs["target"]]
+        return [self.binary, "-n", "4", str(confine_path(kwargs["target"], "target"))]
 
 
 class BinwalkScan(Tool):
@@ -89,7 +94,7 @@ class BinwalkScan(Tool):
     }
 
     def build_command(self, **kwargs: Any) -> list[str]:
-        return [self.binary, kwargs["target"]]
+        return [self.binary, str(confine_path(kwargs["target"], "target"))]
 
 
 class HashIdentify(Tool):

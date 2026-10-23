@@ -36,6 +36,45 @@ def test_requires_scope_check_for_honors_per_tool_exception_list():
     assert server.requires_scope_check_for("port_scan") is True
 
 
+def test_remote_tool_scope_checks_a_url_named_argument(monkeypatch):
+    # Reported by an external reviewer: a remote tool whose host argument is called "url"
+    # (or "host"/"hostname") rather than "target" went through authorized on an empty
+    # string, never the real value.
+    server = McpServerConfig(name="svc", command="python", risk_level=ToolRiskLevel.INTRUSIVE)
+    tool = RemoteMCPTool(server=server, remote_name="fetch", description="", input_schema={})
+    guard = ScopeGuard(engagement_name="t", allow=["app.lab.local"], max_risk_level=ToolRiskLevel.INTRUSIVE)
+    with pytest.raises(ScopeViolation):
+        tool.run(guard, url="https://evil.other.com/")
+
+
+def test_remote_tool_scope_checks_a_host_named_argument_too():
+    server = McpServerConfig(name="svc", command="python", risk_level=ToolRiskLevel.INTRUSIVE)
+    tool = RemoteMCPTool(server=server, remote_name="fetch", description="", input_schema={})
+    guard = ScopeGuard(engagement_name="t", allow=["app.lab.local"], max_risk_level=ToolRiskLevel.INTRUSIVE)
+    with pytest.raises(ScopeViolation):
+        tool.run(guard, host="evil.other.com")
+
+
+def test_remote_tool_host_field_override_is_used_over_the_defaults(monkeypatch):
+    server = McpServerConfig(
+        name="svc", command="python", risk_level=ToolRiskLevel.INTRUSIVE,
+        host_fields={"fetch": "endpoint"},
+    )
+    tool = RemoteMCPTool(server=server, remote_name="fetch", description="", input_schema={})
+    guard = ScopeGuard(engagement_name="t", allow=["app.lab.local"], max_risk_level=ToolRiskLevel.INTRUSIVE)
+    with pytest.raises(ScopeViolation):
+        # "target" is a decoy here: the configured override says the real host is "endpoint".
+        tool.run(guard, target="app.lab.local", endpoint="evil.other.com")
+
+
+def test_remote_tool_scope_checked_with_no_host_field_present_fails_closed():
+    server = McpServerConfig(name="svc", command="python", risk_level=ToolRiskLevel.INTRUSIVE)
+    tool = RemoteMCPTool(server=server, remote_name="fetch", description="", input_schema={})
+    guard = ScopeGuard(engagement_name="t", allow=["app.lab.local"], max_risk_level=ToolRiskLevel.INTRUSIVE)
+    with pytest.raises(ScopeViolation):
+        tool.run(guard, unrelated_arg="whatever")
+
+
 def test_load_mcp_server_configs_parses_yaml(tmp_path):
     config_file = tmp_path / "mcp_servers.yaml"
     config_file.write_text(

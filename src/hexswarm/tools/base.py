@@ -51,6 +51,26 @@ class ToolResult:
         }
 
 
+def reject_leading_dash(value: str, field_name: str) -> None:
+    """Raise ValueError if `value` starts with '-' once surrounding whitespace is stripped.
+
+    Every tool here hands operator/agent-supplied strings to a real CLI binary as a bare
+    positional argv element, with no '--' separator in front of it. getopt-style parsers
+    (nmap, gobuster, sqlmap, ssh, hydra, ...) decide whether an argv element is an option by
+    its own leading character, not by its position, so a target or username that happens to
+    start with '-' can be read as a flag instead of a value: a crafted target like
+    '--script=...' smuggling an extra nmap flag, or an ssh_user like '-oProxyCommand=...'
+    smuggling an ssh option. A legitimate host, IP, URL, username or file path never starts
+    with '-', so rejecting it outright closes the class of bug without needing a '--'
+    separator convention to be correct in every adapter and every version of every binary.
+    """
+    if value.strip().startswith("-"):
+        raise ValueError(
+            f"{field_name} must not start with '-' (got {value!r}); this would risk being "
+            "read as a command-line option by the underlying tool instead of a value."
+        )
+
+
 class Tool(ABC):
     """Base class for a single wrapped security tool."""
 
@@ -120,6 +140,8 @@ class Tool(ABC):
 
     def run(self, guard: ScopeGuard, **kwargs: Any) -> ToolResult:
         target = kwargs.get("target", "")
+        if isinstance(target, str) and target:
+            reject_leading_dash(target, "target")
         if self.requires_scope_check:
             guard.authorize(target, self.risk_level)
         else:

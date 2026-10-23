@@ -25,8 +25,15 @@ import yaml
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from hexswarm.safety.guard import ScopeGuard, ToolRiskLevel
+from hexswarm.safety.guard import ScopeGuard, ScopeViolation, ToolRiskLevel
 from hexswarm.tools.base import ToolResult
+
+# A remote tool's actual host-naming argument isn't always called "target": an MCP server
+# someone else wrote might call it "url" or "host" instead. Checking only "target" meant any
+# such tool's real network destination never went through the scope guard at all (it still
+# got authorized, just on an empty string standing in for it). Every one of these is checked,
+# in order, and the first one present with a non-empty value is what gets scope-checked.
+DEFAULT_HOST_FIELDS: tuple[str, ...] = ("target", "url", "host", "hostname")
 
 
 @dataclass
@@ -44,6 +51,11 @@ class McpServerConfig:
     # remote tool's name here turns off the host-scope check for that tool alone,
     # the same way a local Tool sets requires_scope_check=False on itself.
     non_scope_checked_tools: list[str] = field(default_factory=list)
+    # Maps a remote tool's name to the single kwarg name that holds its host, when that isn't
+    # one of DEFAULT_HOST_FIELDS or when a tool happens to have more than one of them and the
+    # operator knows which one is real (e.g. both "host" and "url" present, only "url" is
+    # actually dialed). Optional: most tools don't need an entry here.
+    host_fields: dict[str, str] = field(default_factory=dict)
 
     def to_server_params(self) -> StdioServerParameters:
         return StdioServerParameters(command=self.command, args=self.args, env=self.env)
@@ -52,6 +64,9 @@ class McpServerConfig:
         if remote_tool_name in self.non_scope_checked_tools:
             return False
         return self.requires_scope_check
+
+    def host_field_for(self, remote_tool_name: str) -> str | None:
+        return self.host_fields.get(remote_tool_name)
 
 
 def load_mcp_server_configs(path: str | Path) -> list[McpServerConfig]:
@@ -81,6 +96,7 @@ def load_mcp_server_configs(path: str | Path) -> list[McpServerConfig]:
                 requires_scope_check=entry.get("requires_scope_check", True),
                 category=entry.get("category", "mcp-external"),
                 non_scope_checked_tools=list(entry.get("non_scope_checked_tools", [])),
+                host_fields=dict(entry.get("host_fields", {})),
             )
         )
     return configs
@@ -146,9 +162,28 @@ class RemoteMCPTool:
                     parts.append(text)
             return "\n".join(parts) if parts else str(result.content)
 
+    def _extract_host_value(self, kwargs: dict[str, Any]) -> str:
+        override = self.server.host_field_for(self._remote_name)
+        if override is not None:
+            value = kwargs.get(override, "")
+            return value if isinstance(value, str) else ""
+        for field_name in DEFAULT_HOST_FIELDS:
+            value = kwargs.get(field_name)
+            if isinstance(value, str) and value.strip():
+                return value
+        return ""
+
     def run(self, guard: ScopeGuard, **kwargs: Any) -> ToolResult:
-        target = kwargs.get("target", "")
+        target = self._extract_host_value(kwargs)
         if self.requires_scope_check:
+            if not target:
+                raise ScopeViolation(
+                    f"'{self.name}' is scope-checked but none of {DEFAULT_HOST_FIELDS} (or the "
+                    "configured host_fields override) was present with a value in its "
+                    "arguments, so no host could be authorized. Add a host_fields entry in the "
+                    "MCP server config naming this tool's real argument, or set "
+                    "non_scope_checked_tools if it genuinely never touches a network target."
+                )
             guard.authorize(target, self.risk_level)
         else:
             guard.check_risk(self.risk_level)

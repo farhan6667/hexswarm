@@ -43,7 +43,10 @@ def test_registry_contains_adopted_tools():
         assert expected in names
 
 
-def test_adopted_tools_build_commands():
+def test_adopted_tools_build_commands(tmp_path, monkeypatch):
+    monkeypatch.setenv("HEXSWARM_WORK_DIR", str(tmp_path))
+    subs_file = tmp_path / "subs.txt"
+    subs_file.write_text("sub.example.com\n")
     reg = ToolRegistry
     assert reg.get("subdomain_enum").build_command(target="example.com") == [
         "amass", "enum", "-passive", "-d", "example.com",
@@ -51,8 +54,8 @@ def test_adopted_tools_build_commands():
     assert reg.get("osint_harvest").build_command(target="example.com")[:3] == [
         "theHarvester", "-d", "example.com",
     ]
-    assert reg.get("subdomain_takeover").build_command(target="subs.txt") == [
-        "SubOver", "-l", "subs.txt",
+    assert reg.get("subdomain_takeover").build_command(target=str(subs_file)) == [
+        "SubOver", "-l", str(subs_file.resolve()),
     ]
     assert reg.get("xss_scan").build_command(target="http://x/?q=1")[:3] == [
         "dalfox", "url", "http://x/?q=1",

@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 from hexswarm.safety.guard import ToolRiskLevel
-from hexswarm.tools.base import Tool, ToolRegistry
+from hexswarm.tools.base import Tool, ToolRegistry, reject_leading_dash
 
 
 class LinuxPrivescEnum(Tool):
@@ -51,6 +51,11 @@ class LinuxPrivescEnum(Tool):
         # inside an ssh command string. It never touches this machine's own /tmp, so the
         # local-temp-file-race concern that rule exists for doesn't apply here.
         remote_script_path = kwargs.get("remote_script_path", "/tmp/linpeas.sh")  # nosec B108
+        # ssh_user ends up as the first characters of the single 'user@host' argv element
+        # ssh actually receives; a value starting with '-' (e.g. '-oProxyCommand=...') can be
+        # read by ssh as an option instead of a username, the same class of bug as the target
+        # check in Tool.run(), just on a field ssh-specific rather than scope-checked.
+        reject_leading_dash(kwargs["ssh_user"], "ssh_user")
         connection = f"{kwargs['ssh_user']}@{kwargs['target']}"
         return [self.binary, connection, f"bash {remote_script_path}"]
 

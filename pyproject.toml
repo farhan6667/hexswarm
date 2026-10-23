@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hexswarm"
-version = "1.0.2"
+version = "1.1.0"
 description = "A swarm-of-agents framework for AI-driven offensive security research, pentesting labs, and CTF solving."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -27,7 +27,12 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "litellm>=1.50.0",
+    # Upper-bounded after the 2026-10-21 LiteLLM supply-chain compromise: PyPI and the
+    # Docker images briefly served a malicious 1.107.0 (a credential stealer plus a second-
+    # stage RAT, see SECURITY.md). 1.106.2 is the confirmed-clean version named in the
+    # vendor's own advisory. Re-open the upper bound only once a later release has been
+    # independently verified clean, not just because PyPI shows it as latest.
+    "litellm>=1.106.2,<1.107",
     "typer>=0.12.0",
     "rich>=13.7.0",
     "pydantic>=2.6.0",

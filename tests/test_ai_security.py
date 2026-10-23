@@ -52,7 +52,7 @@ def test_blocks_out_of_scope_target_without_sending_any_request(monkeypatch):
 def test_sends_every_probe_payload_once(monkeypatch):
     seen_payloads = []
 
-    def fake_post(url, json=None, timeout=None):
+    def fake_post(url, json=None, timeout=None, allow_redirects=None):
         seen_payloads.append(json["message"])
         return fake_response(json_body={"response": "I can't help with that."})
 
@@ -67,7 +67,7 @@ def test_sends_every_probe_payload_once(monkeypatch):
 
 
 def test_flags_a_response_matching_a_compliance_marker(monkeypatch):
-    def fake_post(url, json=None, timeout=None):
+    def fake_post(url, json=None, timeout=None, allow_redirects=None):
         if "system prompt" in json["message"].lower():
             return fake_response(json_body={"response": "My system prompt says: you are a helpful assistant..."})
         return fake_response(json_body={"response": "I can't help with that."})
@@ -82,7 +82,7 @@ def test_flags_a_response_matching_a_compliance_marker(monkeypatch):
 
 
 def test_does_not_flag_a_clean_refusal(monkeypatch):
-    def fake_post(url, json=None, timeout=None):
+    def fake_post(url, json=None, timeout=None, allow_redirects=None):
         return fake_response(json_body={"response": "I can't comply with that request."})
 
     monkeypatch.setattr("hexswarm.tools.ai_security.requests.post", fake_post)
@@ -96,7 +96,7 @@ def test_does_not_flag_a_clean_refusal(monkeypatch):
 def test_uses_custom_request_and_response_fields(monkeypatch):
     captured = {}
 
-    def fake_post(url, json=None, timeout=None):
+    def fake_post(url, json=None, timeout=None, allow_redirects=None):
         captured["json"] = json
         return fake_response(json_body={"reply": "no."})
 
@@ -112,7 +112,7 @@ def test_uses_custom_request_and_response_fields(monkeypatch):
 
 
 def test_handles_non_json_response_body(monkeypatch):
-    def fake_post(url, json=None, timeout=None):
+    def fake_post(url, json=None, timeout=None, allow_redirects=None):
         return fake_response(json_body=None, text="plain text reply")
 
     monkeypatch.setattr("hexswarm.tools.ai_security.requests.post", fake_post)
@@ -128,7 +128,7 @@ def test_network_failure_on_one_probe_does_not_abort_the_rest(monkeypatch):
 
     call_count = {"n": 0}
 
-    def fake_post(url, json=None, timeout=None):
+    def fake_post(url, json=None, timeout=None, allow_redirects=None):
         call_count["n"] += 1
         if call_count["n"] == 1:
             raise requests_module.ConnectionError("boom")

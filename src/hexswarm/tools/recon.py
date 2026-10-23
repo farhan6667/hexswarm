@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from hexswarm.safety.guard import ToolRiskLevel
-from hexswarm.tools.base import Tool, ToolRegistry
+from hexswarm.safety.guard import ScopeGuard, ScopeViolation, ToolRiskLevel
+from hexswarm.safety.paths import confine_path
+from hexswarm.tools.base import Tool, ToolRegistry, ToolResult
 
 
 class WhoisLookup(Tool):
@@ -198,8 +199,12 @@ class SubdomainTakeover(Tool):
     )
     binary: ClassVar[str] = "SubOver"
     risk_level: ClassVar[ToolRiskLevel] = ToolRiskLevel.ACTIVE_RECON
-    # 'target' here is a path to a staged subdomain-list file, not a network host, so it can't
-    # satisfy the host/CIDR/domain scope matcher. It still clears the risk gate.
+    # 'target' is the staged file's path, not a network host, so it can't satisfy the
+    # host/CIDR/domain scope matcher and the base Tool.run() scope check is skipped for it.
+    # The actual network targets are the subdomains INSIDE that file, each one real traffic
+    # SubOver will send: run() below reads them and scope-checks every single one itself,
+    # since skipping requires_scope_check here must not mean skipping scope checking
+    # altogether.
     requires_scope_check: ClassVar[bool] = False
     timeout_seconds: ClassVar[int] = 300
     parameters_schema: ClassVar[dict[str, Any]] = {
@@ -213,8 +218,26 @@ class SubdomainTakeover(Tool):
         "required": ["target"],
     }
 
+    def run(self, guard: ScopeGuard, **kwargs: Any) -> ToolResult:
+        path = confine_path(kwargs["target"], "target")
+        subdomains = [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        out_of_scope = []
+        for subdomain in subdomains:
+            try:
+                guard.check_target(subdomain)
+            except ScopeViolation:
+                out_of_scope.append(subdomain)
+        if out_of_scope:
+            raise ScopeViolation(
+                f"{kwargs['target']} lists {len(out_of_scope)} subdomain(s) not covered by any "
+                f"allow rule in scope '{guard.engagement_name}': {', '.join(out_of_scope[:10])}"
+                f"{'...' if len(out_of_scope) > 10 else ''}. Every subdomain in this file is a "
+                "real target SubOver will probe; fix the list or the scope file before running."
+            )
+        return super().run(guard, **kwargs)
+
     def build_command(self, **kwargs: Any) -> list[str]:
-        return [self.binary, "-l", kwargs["target"]]
+        return [self.binary, "-l", str(confine_path(kwargs["target"], "target"))]
 
 
 ToolRegistry.register(WhoisLookup())
