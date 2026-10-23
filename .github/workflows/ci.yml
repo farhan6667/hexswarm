@@ -1,8 +1,11 @@
 name: CI
 
+# Runs on every push to every branch, not just main: a 2026-10-23 release broke the 3.10-3.12
+# matrix with a dependency pin generated on a different Python version, and the mistake only
+# surfaced after it reached main because CI had never run against the feature branch. See
+# docs/process-notes/2026-10-security-reviews-root-cause.md.
 on:
   push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -10,8 +13,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v7
 
@@ -46,4 +50,15 @@ jobs:
           # PyPI, so trying to audit it as a "dependency" always fails. --strict would
           # treat that intentional skip as a collection failure too, so it's dropped;
           # pip-audit already exits non-zero on its own if a real vulnerability is found.
-          pip-audit --skip-editable
+          #
+          # --ignore-vuln CVE-2026-112907/112913/112940: filelock 3.32.7, pulled in
+          # transitively by litellm, which pins filelock<4.0 (confirmed against litellm
+          # 1.106.2's own METADATA). The fix is in filelock 4.2.1; there is no fixed 3.x
+          # release, so there is currently no version that satisfies both "patched" and
+          # "what litellm 1.106.2 allows." See SECURITY.md's "Known limits". Revisit (and
+          # remove these three ignores) once litellm raises or drops its filelock ceiling,
+          # or re-pins to a release it has.
+          pip-audit --skip-editable \
+            --ignore-vuln CVE-2026-112907 \
+            --ignore-vuln CVE-2026-112913 \
+            --ignore-vuln CVE-2026-112940

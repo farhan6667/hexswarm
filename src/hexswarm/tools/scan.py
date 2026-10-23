@@ -5,7 +5,7 @@ from typing import Any, ClassVar
 
 from hexswarm.safety.guard import ToolRiskLevel
 from hexswarm.safety.paths import confine_path
-from hexswarm.tools.base import Tool, ToolRegistry
+from hexswarm.tools.base import Tool, ToolRegistry, reject_leading_dash
 
 
 class WebVulnScan(Tool):
@@ -95,6 +95,11 @@ class PasswordBruteForce(Tool):
     }
 
     def build_command(self, **kwargs: Any) -> list[str]:
+        # 'service' is a trailing positional with no preceding flag of its own (unlike
+        # userlist/passlist, which are each already consumed as the argument to -L/-P), so
+        # a dash-leading value here is read by hydra's own getopt as an independent option
+        # (-o to redirect output, -R to restore a session, etc.), not rejected as garbage.
+        reject_leading_dash(kwargs["service"], "service")
         return [
             self.binary,
             "-L", str(confine_path(kwargs["userlist"], "userlist")),

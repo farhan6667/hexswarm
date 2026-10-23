@@ -13,6 +13,7 @@ from hexswarm.safety.paths import PathConfinementError, confine_path
 from hexswarm.tools.ai_security import LlmScan, PromptInjectionProbe
 from hexswarm.tools.base import ToolRegistry, reject_leading_dash
 from hexswarm.tools.ctf import FileIdentify
+from hexswarm.tools.exploit import MetasploitModuleRun
 from hexswarm.tools.privesc import LinuxPrivescEnum
 from hexswarm.tools.recon import SubdomainTakeover
 from hexswarm.tools.scan import DirectoryBrute, PasswordBruteForce
@@ -158,3 +159,54 @@ def test_octet_wildcard_allow_rule_does_not_admit_an_unrelated_host():
     g.check_target("10.10.10.5")  # should not raise
     with pytest.raises(ScopeViolation):
         g.check_target("8.8.8.8")
+
+
+# --- Found by an independent adversarial review pass after the above shipped: the original
+# assertion above never tried a hostname that *extends* the octet prefix, so it passed while
+# this exact bypass was open. ----------------------------------------------------------------
+
+def test_octet_wildcard_does_not_admit_a_hostname_merely_sharing_its_textual_prefix():
+    g = ScopeGuard(engagement_name="t", allow=["10.10.10.*"], max_risk_level=ToolRiskLevel.POST_EXPLOIT)
+    for hostile in ("10.10.10.evil.com", "10.10.10.0.attacker.com", "10.10.10.5.xip.io"):
+        with pytest.raises(ScopeViolation):
+            g.check_target(hostile)
+
+
+def test_password_brute_force_rejects_a_dash_leading_service():
+    tool = PasswordBruteForce()
+    with pytest.raises(ValueError):
+        tool.build_command(target="10.10.10.5", service="-o/tmp/out", userlist="u.txt", passlist="p.txt")
+
+
+def test_port_scan_rejects_a_flag_disguised_as_a_port_spec(monkeypatch):
+    tool = ToolRegistry.get("port_scan")
+    monkeypatch.setattr(tool, "is_available", lambda: False)
+    with pytest.raises(ValueError):
+        tool.build_command(target="10.10.10.5", ports="-sS")
+
+
+def test_port_scan_still_allows_the_documented_all_ports_syntax():
+    tool = ToolRegistry.get("port_scan")
+    cmd = tool.build_command(target="10.10.10.5", ports="-")
+    assert "-p" in cmd and "-" in cmd
+
+
+def test_osint_harvest_rejects_a_flag_disguised_as_a_source_list():
+    tool = ToolRegistry.get("osint_harvest")
+    with pytest.raises(ValueError):
+        tool.build_command(target="example.com", sources="-x")
+
+
+def test_metasploit_rejects_setg_rhosts_not_just_set():
+    tool = MetasploitModuleRun()
+    with pytest.raises(ValueError):
+        tool.build_command(target="10.10.10.5", module="exploit/x", extra_options="setg RHOSTS 8.8.8.8")
+
+
+def test_metasploit_rejects_a_use_line_smuggled_into_extra_options():
+    tool = MetasploitModuleRun()
+    with pytest.raises(ValueError):
+        tool.build_command(
+            target="10.10.10.5", module="exploit/x",
+            extra_options="use exploit/y\nset RHOSTS 8.8.8.8",
+        )
