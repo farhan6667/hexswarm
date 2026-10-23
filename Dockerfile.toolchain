@@ -21,23 +21,39 @@ LABEL org.opencontainers.image.source="https://github.com/farhan6667/hexswarm" \
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3 python3-pip python3-venv \
-        nmap \
-        nuclei \
-        gobuster \
-        sqlmap \
-        hydra \
-        metasploit-framework \
-        exploitdb \
-        whois \
-        subfinder \
-        amass \
-        whatweb \
-        dalfox \
-        binutils \
-        file \
-        hashid \
+# kali-rolling's default sources.list points at http.kali.org, a GeoIP redirector that can
+# hand out a flaky regional mirror (seen in CI: mirror.us.cdn-perfprod.com timing out mid
+# apt-get install, after apt-get update had already succeeded against it). apt itself has no
+# per-package mirror fallback once a transfer starts failing partway through a batch, so this
+# retries the whole update+install a few times with a short backoff, which is what actually
+# recovers from a transient failure on one specific mirror rather than a config that still
+# depends on that same mirror being reliable from the first byte to the last.
+RUN apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=30 && \
+    ok=0; \
+    for attempt in 1 2 3 4 5; do \
+        if apt-get install -y --no-install-recommends -o Acquire::Retries=5 -o Acquire::http::Timeout=30 \
+            python3 python3-pip python3-venv \
+            nmap \
+            nuclei \
+            gobuster \
+            sqlmap \
+            hydra \
+            metasploit-framework \
+            exploitdb \
+            whois \
+            subfinder \
+            amass \
+            whatweb \
+            dalfox \
+            binutils \
+            file \
+            hashid; \
+        then ok=1; break; fi; \
+        echo "apt-get install attempt $attempt failed, retrying in 15s..."; \
+        sleep 15; \
+        apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=30; \
+    done; \
+    test "$ok" = "1" \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home --shell /bin/bash hexswarm
