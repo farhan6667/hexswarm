@@ -30,9 +30,9 @@ LABEL org.opencontainers.image.source="https://github.com/farhan6667/hexswarm"  
 RUN useradd --create-home --shell /bin/bash hexswarm
 WORKDIR /app
 
-COPY pyproject.toml README.md constraints.txt ./
+COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install --no-cache-dir -c constraints.txt .
+RUN pip install --no-cache-dir .
 
 USER hexswarm
 WORKDIR /work

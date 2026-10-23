@@ -31,12 +31,13 @@ but reports are taken seriously and acknowledged as soon as possible.
 
 ## Supply chain
 
-HexSwarm pins its runtime dependencies in `constraints.txt` (regenerated and reviewed deliberately, not on
-every release) and both Dockerfiles install with `pip install -c constraints.txt .`, so a fresh build pulls
-exactly the versions that were reviewed, not whatever happens to be newest on PyPI that day. CI runs
-`pip-audit` on every push/PR, and a separate nightly workflow (`dependency-audit.yml`) re-checks the pinned
-set on a schedule, so a version already on disk getting yanked or newly flagged doesn't go unnoticed just
-because nobody pushed a commit that day.
+HexSwarm bounds the dependencies most worth bounding directly in `pyproject.toml` (see `litellm` below) rather
+than a full hash-locked `constraints.txt`: a first attempt at a full freeze broke CI across the 3.10-3.12
+matrix (one transitive dependency resolved a version with no wheel available for every supported Python), so
+it was reverted in favor of targeted bounds that don't fight pip's own resolver. CI runs `pip-audit` on every
+push/PR, and a separate nightly workflow (`dependency-audit.yml`) re-runs it on a schedule, so a newly
+published advisory against something already installed doesn't go unnoticed just because nobody pushed a
+commit that day.
 
 This exists because of a real incident: on 2026-10-21, a malicious `litellm` 1.107.0 was published to PyPI
 and Docker Hub/GHCR (a credential stealer plus a second-stage RAT, live roughly 11:39-14:20 UTC; see

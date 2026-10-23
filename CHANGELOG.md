@@ -47,11 +47,16 @@ rather than as its own tag. If a separate 1.0.3 tag is wanted instead, split thi
   2026-10-21 PyPI/Docker supply-chain compromise of `litellm` 1.107.0. See the "Supply
   chain" section of SECURITY.md for the incident, what was checked, and what to do if you
   installed the compromised version yourself.
-- New `constraints.txt`, pinning every resolved runtime and dev dependency. Both
-  Dockerfiles and CI now install with `pip install -c constraints.txt .`.
-- New nightly workflow `dependency-audit.yml`: re-runs `pip-audit` against the pinned set
-  on a schedule, so a dependency getting yanked or newly flagged doesn't require a push to
-  notice.
+- New nightly workflow `dependency-audit.yml`: re-runs `pip-audit` on a schedule, so a
+  newly published advisory doesn't require a push to notice.
+- A full hash-locked `constraints.txt` was tried first and reverted within this same
+  release: it was generated from one Python 3.14 environment and broke every other
+  supported version (3.10-3.12) once pushed, because a transitive pin (`pydantic-settings
+  ==2.16.1`) had no matching wheel there. CI, the toolchain image build, and the
+  lab-validation workflow all failed on the first push of this release; caught within the
+  hour, `constraints.txt` removed, both Dockerfiles and CI reverted to a plain
+  `pip install .` the same day. The `litellm` bound in `pyproject.toml` is the actual fix
+  for the incident and was unaffected throughout.
 
 ## [1.0.2] - 2026-10-23
 

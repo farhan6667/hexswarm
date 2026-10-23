@@ -1,9 +1,9 @@
 name: Nightly dependency audit
 
-# Catches a dependency going bad between releases: a pinned version in constraints.txt
-# getting yanked from PyPI, or a new advisory landing against one of the versions we're
-# pinned to. CI's own pip-audit step only runs against whatever a push/PR actually
-# installs; this runs on a schedule so it also fires on a day nobody pushed anything.
+# Catches a dependency going bad between releases: a new advisory landing against a
+# version we currently resolve to, including one already installed. CI's own pip-audit
+# step only runs against whatever a push/PR actually installs; this runs on a schedule
+# so it also fires on a day nobody pushed anything.
 on:
   schedule:
     - cron: "17 6 * * *"
@@ -20,14 +20,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install pinned dependencies
-        run: pip install -c constraints.txt -e ".[dev]"
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
 
       - name: Dependency vulnerability scan (pip-audit)
         run: |
           pip install pip-audit
           pip-audit --skip-editable
-
-      - name: Check every pinned version is still installable (catches a yank)
-        run: |
-          pip install --no-deps --dry-run -r constraints.txt
