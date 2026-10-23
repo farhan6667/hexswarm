@@ -3,7 +3,24 @@
 All notable changes to HexSwarm are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [1.0.2] - 2026-10-23
+
+### Security
+- **Scope bypass: a target with no URL scheme was glob-matched unparsed.** An allow rule written
+  as a domain glob (e.g. `*.lab.local`) matched a crafted value such as `evil.com/?x.lab.local`,
+  because the glob's leading `*` matched straight across the `/`, `?` and everything else up to
+  the real suffix. Fixed by always parsing a target into its host component before matching
+  (with or without a scheme), and failing closed when no clean host can be extracted. Reported by
+  an external reviewer; thank you.
+- **`metasploit_module_run`'s `extra_options` could redefine RHOSTS/RHOST.** The scope guard only
+  ever authorized the `target` field; a call could pass scope on an in-scope `target` and still
+  set a different host through `extra_options`, since `msfconsole` uses whichever `set RHOSTS`
+  line ran last in the resource script. `extra_options` now rejects any line that sets
+  RHOST/RHOSTS; that value only ever comes from `target`, the one the scope guard checks.
+  Reported by the same external reviewer.
+- Added a hostile test suite for both issues, plus related edge cases (ports, trailing dots,
+  case, bare IPv6 literals, userinfo-style targets) that the fix also had to get right without
+  reopening either bug.
 
 ### Changed
 - The Kali-based toolchain image now also installs amass and dalfox, so the new subdomain_enum and

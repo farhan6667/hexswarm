@@ -13,7 +13,7 @@ import ipaddress
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlsplit
 
 import yaml
 
@@ -72,26 +72,59 @@ class ScopeGuard:
         )
 
     @staticmethod
-    def _extract_host(target: str) -> str:
-        """Pulls the bare host out of a URL-style target.
+    def _extract_host(target: str) -> str | None:
+        """Pulls the bare host out of a target, with or without a URL scheme.
 
         Several tools (web_vuln_scan, directory_brute, sql_injection_scan,
         http_fingerprint, ...) take a full URL like 'https://example.com/admin'
         as their target. Matching that whole string against a scope entry
         written as a domain ('*.example.com') would never succeed, since the
         scheme and path are part of the string being glob-matched. Scope
-        files are written in terms of hosts, so URL targets are reduced to
-        their host before matching.
+        files are written in terms of hosts, so targets are reduced to their
+        host before matching.
+
+        A target with no '://' used to be matched against scope patterns
+        completely unparsed. Since fnmatch's '*' matches any character
+        including '/', '?' and '@', an allow pattern like '*.lab.local'
+        then also matched a crafted value such as 'evil.com/?x.lab.local':
+        the pattern's leading '*' simply ate everything up to the real
+        suffix. Parsing every target through the same authority grammar
+        (prepending '//' when no scheme is present, exactly what a bare
+        'host[:port]' or 'user@host' already is) extracts the real host
+        component the same way regardless of whether a scheme was given,
+        so the match happens on an actual host, never on an unparsed
+        string a caller shaped to smuggle one past the glob.
+
+        Returns None when no single clean host can be extracted (including
+        an empty or whitespace-only target), so a caller fails closed
+        instead of falling back to matching raw, un-parsed text.
         """
         target = target.strip()
-        if "://" in target:
-            parsed = urlparse(target)
-            return parsed.hostname or target
-        return target
+        if not target:
+            return None
+        try:
+            # A bare IPv4/IPv6 literal (optionally unbracketed IPv6, e.g. '::1')
+            # is valid input but not valid URL authority syntax; check it
+            # directly before attempting to parse it as one.
+            ipaddress.ip_address(target)
+            return target
+        except ValueError:
+            pass
+        candidate = target if "://" in target else f"//{target}"
+        try:
+            parsed = urlsplit(candidate)
+        except ValueError:
+            return None
+        host = parsed.hostname
+        if not host:
+            return None
+        return host.rstrip(".")
 
     def _matches(self, pattern: str, raw_target: str) -> bool:
         pattern = pattern.strip()
         target = self._extract_host(raw_target)
+        if target is None:
+            return False
         # CIDR / IP network match
         try:
             network = ipaddress.ip_network(pattern, strict=False)

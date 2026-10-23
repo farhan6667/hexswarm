@@ -90,6 +90,64 @@ def test_matches_url_target_still_applies_deny_rules():
         guard.check_target("https://admin.example.com/login")
 
 
+def test_rejects_scheme_free_target_that_smuggles_an_allowed_suffix():
+    # Reported by an external reviewer: '_extract_host' only parsed a target as a URL when
+    # it contained '://'. Without a scheme, the raw string (including a path-looking tail)
+    # was glob-matched verbatim, so fnmatch's '*' in '*.lab.local' happily matched right
+    # over 'evil.com/?' to reach the trailing '.lab.local'. The real host here is
+    # 'evil.com', which is not covered by any allow rule, so this must be rejected.
+    guard = make_guard(allow=["*.lab.local"], deny=[])
+    with pytest.raises(ScopeViolation):
+        guard.check_target("evil.com/?x.lab.local")
+
+
+def test_still_allows_the_real_in_scope_host_without_a_scheme():
+    guard = make_guard(allow=["*.lab.local"], deny=[])
+    guard.check_target("host.lab.local")  # should not raise
+
+
+def test_allows_scheme_free_target_with_a_port():
+    # A bare 'host:port' used to be matched unparsed too, so the trailing ':4444' broke the
+    # '*.lab.local' suffix match and a legitimate in-scope target was wrongly rejected.
+    guard = make_guard(allow=["*.lab.local"], deny=[])
+    guard.check_target("host.lab.local:4444")  # should not raise
+
+
+def test_allows_scheme_free_target_with_a_trailing_dot():
+    guard = make_guard(allow=["*.lab.local"], deny=[])
+    guard.check_target("host.lab.local.")  # should not raise
+
+
+def test_allows_scheme_free_target_regardless_of_case():
+    guard = make_guard(allow=["*.lab.local"], deny=[])
+    guard.check_target("HOST.LAB.LOCAL")  # should not raise
+
+
+def test_userinfo_style_target_is_matched_on_the_real_host_not_the_fake_username():
+    # 'evil.com@host.lab.local' names host.lab.local with a username of 'evil.com', the
+    # same way a browser would read it. The allow rule is about the real host, so this is
+    # legitimately in scope, not a bypass.
+    guard = make_guard(allow=["*.lab.local"], deny=[])
+    guard.check_target("evil.com@host.lab.local")  # should not raise
+
+
+def test_url_userinfo_does_not_let_the_path_or_username_stand_in_for_the_host():
+    guard = make_guard(allow=["*.lab.local"], deny=[])
+    with pytest.raises(ScopeViolation):
+        guard.check_target("http://host.lab.local@evil.com/")
+
+
+def test_bare_ipv6_literal_without_brackets_still_matches_a_cidr_allow_rule():
+    guard = make_guard(allow=["::1/128"], deny=[])
+    guard.check_target("::1")  # should not raise
+
+
+def test_empty_target_is_rejected_rather_than_matched_as_an_unparsed_string():
+    guard = make_guard(allow=["*.lab.local"], deny=[])
+    with pytest.raises(ScopeViolation):
+        guard.check_target("")
+
+
 def test_from_file_loads_valid_scope(tmp_path):
     scope_path = tmp_path / "scope.yaml"
     scope_path.write_text(
