@@ -71,7 +71,7 @@ jobs:
 
       - name: Upload the lab findings and compliance mapping
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lab-compliance-mapping
           path: lab-out/
