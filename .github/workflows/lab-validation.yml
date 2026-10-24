@@ -42,7 +42,7 @@ jobs:
   lab-validation:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build the toolchain image (current code, with the web tools)
         run: docker build -f Dockerfile.toolchain -t hexswarm-toolchain:ci .
